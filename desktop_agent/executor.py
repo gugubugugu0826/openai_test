@@ -65,7 +65,6 @@ def load_execution_items():
 
 
 def get_target_path(item):
-    config = load_config()
     src = Path(item["path"])
     item_type = item["type"]
 
@@ -75,6 +74,7 @@ def get_target_path(item):
         folder = SHORTCUT_CATEGORY_FOLDERS.get(category, "99_其他快捷方式")
         return src.parent / folder / src.name
 
+    config = load_config()
     folder = NORMAL_CATEGORY_FOLDERS.get(category, "无法判断")
     return Path(config["normal_target_root"]) / folder / src.name
 
