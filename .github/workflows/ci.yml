@@ -18,10 +18,30 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Remove stale test report
+        shell: pwsh
+        run: |
+          if (Test-Path test_reports/latest_test_report.md) {
+            Remove-Item test_reports/latest_test_report.md -Force
+          }
 
       - name: Run baseline audit
         run: python tools/run_test_audit.py
+
+      - name: Show test report
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path test_reports/latest_test_report.md) {
+            Get-Content test_reports/latest_test_report.md
+          } else {
+            Write-Host "test_reports/latest_test_report.md not found"
+          }
 
       - name: Upload test report
         if: always()
