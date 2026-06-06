@@ -22,10 +22,14 @@ def safe_print(message):
 
 def run_step(name, command):
     try:
+        env = dict(__import__("os").environ)
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
         completed = subprocess.run(
             command,
             cwd=PROJECT_DIR,
             capture_output=True,
+            env=env,
         )
         stdout = decode_output(completed.stdout)
         stderr = decode_output(completed.stderr)

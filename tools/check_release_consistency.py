@@ -22,6 +22,15 @@ def require(condition, message, failures):
         failures.append(message)
 
 
+def safe_print(message):
+    text = str(message)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        sys.stdout.buffer.write(text.encode(encoding, errors="replace") + b"\n")
+
+
 def read_text(path):
     return path.read_text(encoding="utf-8")
 
@@ -61,16 +70,16 @@ def main():
         failures.append("README.md 含疑似过期的发布命名引用：" + ", ".join(stale_release_refs))
 
     if failures:
-        print("版本/README/发布命名一致性检查失败：")
+        safe_print("版本/README/发布命名一致性检查失败：")
         for item in failures:
-            print(f"- {item}")
+            safe_print(f"- {item}")
         raise SystemExit(1)
 
-    print("版本/README/发布命名一致性检查通过。")
-    print(f"- APP_EXE_NAME: {APP_EXE_NAME}")
-    print(f"- APP_VERSION: {APP_VERSION}")
-    print(f"- release_dir: {release_dir}")
-    print(f"- release_zip: {release_zip}")
+    safe_print("版本/README/发布命名一致性检查通过。")
+    safe_print(f"- APP_EXE_NAME: {APP_EXE_NAME}")
+    safe_print(f"- APP_VERSION: {APP_VERSION}")
+    safe_print(f"- release_dir: {release_dir}")
+    safe_print(f"- release_zip: {release_zip}")
 
 
 if __name__ == "__main__":
