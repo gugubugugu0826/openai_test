@@ -141,6 +141,7 @@ def main():
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     steps = [
+        ("版本一致性检查", [sys.executable, "tools/check_release_consistency.py"]),
         ("编译检查", [sys.executable, "-m", "compileall", "-f", "desktop_agent", "desktop_agent_ui", "desktop_agent_gui.py", "desktop_agent_cli.py"]),
         ("单元测试", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]),
         ("GUI 构建烟测", [sys.executable, "-c", "import customtkinter as ctk; from desktop_agent_ui.app import DesktopAgentGUI; root=ctk.CTk(); root.withdraw(); app=DesktopAgentGUI(root); print('built'); root.destroy()"]),

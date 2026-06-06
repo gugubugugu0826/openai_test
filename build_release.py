@@ -13,7 +13,7 @@ try:
     from desktop_agent.version import APP_EXE_NAME, APP_VERSION
 except Exception:
     APP_EXE_NAME = "QwenDesktopAgent"
-    APP_VERSION = "v1.0"
+    APP_VERSION = "v2.0"
 
 
 APP_NAME = APP_EXE_NAME

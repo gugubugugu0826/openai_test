@@ -173,7 +173,7 @@ python desktop_agent_cli.py <command>
 | `folder_mode` | `copy`（推荐，保留原文件）或 `move` | `copy` |
 | `batch_size` | 每批送 AI 的数量 | `8` |
 | `max_internal_items_per_folder` | 文件夹内部采样数量 | `200` |
-| `update_manifest_url` | 远程更新清单地址，指向 `latest.json` | 空 |
+| `update_manifest_url` | 远程更新清单地址，推荐使用 GitHub Releases `releases/latest` API | 空 |
 | `auto_check_updates` | 启动时是否自动检查更新 | `true` |
 | `builtin_model_path` | 内置模型路径 | `models\qwen-small.gguf` |
 | `builtin_server_path` | llama-server 路径 | `runtime\llama-server.exe` |
@@ -204,7 +204,7 @@ https://api.github.com/repos/<你的用户名>/<你的仓库名>/releases/latest
 https://api.github.com/repos/gugubugugu0826/openai_test/releases/latest
 ```
 
-然后每次发布新版时，在 GitHub Releases 里创建新版本，并上传 `QwenDesktopAgent_v1.1.zip` 这类 zip 更新包。程序会自动读取 Release 的版本号、更新说明和 zip 下载地址。
+然后每次发布新版时，在 GitHub Releases 里创建新版本，并上传 `QwenDesktopAgent_v2.0.zip` 这类 zip 更新包。程序会自动读取 Release 的版本号、更新说明和 zip 下载地址。
 
 也可以使用你自己的 JSON 地址，例如 GitHub Raw、对象存储或 CDN。
 
@@ -246,6 +246,34 @@ python build_release.py
 > 关键打包开关（`build_release.py` 顶部）：
 > - `BUNDLE_MODEL`：是否把大模型一起打包（默认 False）
 > - `MODEL_DOWNLOAD_URL`：发布版的模型下载直链（默认 hf-mirror 镜像）
+
+## GitHub Actions
+
+仓库已内置两条基础流水线：
+
+- `.github/workflows/ci.yml`
+  - 在 `push main/master` 与 `pull_request` 时运行
+  - 自动执行：
+    - `python tools/check_release_consistency.py`
+    - `python tools/run_test_audit.py`
+  - 上传 `test_reports/latest_test_report.md` 作为 artifact
+
+- `.github/workflows/release.yml`
+  - 在推送 `v*` tag 或手动触发时运行
+  - 自动执行：
+    - 一致性检查
+    - 编译检查 / 单元测试 / GUI smoke test / CLI smoke test
+    - `python build_release.py`
+    - `python tools/package_release_zip.py`
+  - 上传发布目录、zip 包和测试报告
+  - 如果是 `v*` tag，会自动把 zip 包和测试报告附加到 GitHub Release
+
+本地也可以直接运行同一套基线检查：
+
+```bash
+python tools/check_release_consistency.py
+python tools/run_test_audit.py
+```
 
 ---
 
