@@ -10,6 +10,16 @@ REPORT_DIR = PROJECT_DIR / "test_reports"
 REPORT_FILE = REPORT_DIR / "latest_test_report.md"
 
 
+def safe_print(message):
+    text = str(message)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or locale.getpreferredencoding(False) or "utf-8"
+        data = text.encode(encoding, errors="replace")
+        sys.stdout.buffer.write(data + b"\n")
+
+
 def run_step(name, command):
     try:
         completed = subprocess.run(
@@ -151,7 +161,7 @@ def main():
     results = [run_step(name, command) for name, command in steps]
     content, exit_code = build_report(results)
     REPORT_FILE.write_text(content, encoding="utf-8")
-    print(f"测试报告已写入：{REPORT_FILE}")
+    safe_print(f"Test report written to: {REPORT_FILE}")
     raise SystemExit(exit_code)
 
 
