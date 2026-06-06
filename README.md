@@ -207,8 +207,6 @@ python build_release.py
 - 把 `config.release.json` 生成为发布版 `config.json`，并写入模型下载地址、开启首次引导、清空 API Key；
 - 打包前自动结束残留的 `llama-server.exe` / 旧程序进程，避免目录占用导致删除/打包失败。
 
-发布到 GitHub：源码进仓库，**把 `QwenDesktopAgent_v1.0` 压成 zip 上传到 [Releases](../../releases)**，不要把成品/模型塞进代码树。
-
 > 关键打包开关（`build_release.py` 顶部）：
 > - `BUNDLE_MODEL`：是否把大模型一起打包（默认 False）
 > - `MODEL_DOWNLOAD_URL`：发布版的模型下载直链（默认 hf-mirror 镜像）
