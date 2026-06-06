@@ -1,0 +1,50 @@
+# ============================================================
+# 桌面整理助手 / QwenDesktopAgent —— .gitignore
+# 原则：只提交源代码，不提交打包产物、大模型、密钥和运行时数据
+# ============================================================
+
+# ---------- 打包产物（用 build_release.py 重新生成，发布走 GitHub Releases）----------
+build/
+dist/
+*.spec
+QwenDesktopAgent_*/
+*.exe
+
+# ---------- 大文件 / 第三方二进制（太大，文档说明从哪获取，发布走 Releases）----------
+models/
+*.gguf
+
+# ---------- 密钥 / 本地配置（含可能的 API Key，禁止提交）----------
+# 仓库里保留 config.release.json 作为模板即可（请确认其中没有真实 API Key）
+config.json
+
+# ---------- 运行时生成的数据 / 日志 ----------
+logs/
+*.log
+diagnostic_reports/
+desktop_observation.json
+desktop_agent_plan.json
+desktop_human_review.json
+desktop_action_log.json
+desktop_undo_log.txt
+agent_state.json
+desktop_agent_explanation.md
+desktop_agent_explanation.json
+
+# agent_memory.json 会在运行 learn 后被改写，避免反复产生改动。
+# 如果你想把“演示记忆”一并放进仓库，可改成提交一份 agent_memory.sample.json。
+agent_memory.json
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

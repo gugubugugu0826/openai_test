@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "match": "openai_test",
+      "category": "代码项目",
+      "note": "示例：Agent 开发测试项目"
+    },
+    {
+      "match": "assignment",
+      "category": "作业报告",
+      "note": "示例：包含 assignment 的文件优先归为作业报告"
+    }
+  ]
+}
