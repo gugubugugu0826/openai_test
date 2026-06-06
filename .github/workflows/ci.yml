@@ -6,17 +6,17 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest
+    runs-on: windows-2025
     env:
       PYTHONIOENCODING: utf-8
       PYTHONUTF8: "1"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-report
           path: test_reports/latest_test_report.md

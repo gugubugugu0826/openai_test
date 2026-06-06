@@ -15,6 +15,8 @@ README_PATH = PROJECT_DIR / "README.md"
 BUILD_RELEASE_PATH = PROJECT_DIR / "build_release.py"
 APP_UI_PATH = PROJECT_DIR / "desktop_agent_ui" / "app.py"
 LOGS_UI_PATH = PROJECT_DIR / "desktop_agent_ui" / "pages_logs.py"
+CI_WORKFLOW_PATH = PROJECT_DIR / ".github" / "workflows" / "ci.yml"
+RELEASE_WORKFLOW_PATH = PROJECT_DIR / ".github" / "workflows" / "release.yml"
 
 
 def require(condition, message, failures):
@@ -45,6 +47,8 @@ def main():
     build_release = read_text(BUILD_RELEASE_PATH)
     app_ui = read_text(APP_UI_PATH)
     logs_ui = read_text(LOGS_UI_PATH)
+    ci_workflow = read_text(CI_WORKFLOW_PATH)
+    release_workflow = read_text(RELEASE_WORKFLOW_PATH)
 
     require(release_zip in readme, f"README.md 未包含当前发布 zip 名称：{release_zip}", failures)
     require(release_dir in readme, f"README.md 未包含当前发布目录名称：{release_dir}", failures)
@@ -58,6 +62,18 @@ def main():
 
     require(f'APP_VERSION = "{APP_VERSION}"' in app_ui, f"desktop_agent_ui/app.py fallback APP_VERSION 未对齐到 {APP_VERSION}", failures)
     require(f'APP_VERSION = "{APP_VERSION}"' in logs_ui, f"desktop_agent_ui/pages_logs.py fallback APP_VERSION 未对齐到 {APP_VERSION}", failures)
+    require("actions/checkout@v5" in ci_workflow, "ci.yml 未升级到 actions/checkout@v5", failures)
+    require("actions/setup-python@v6" in ci_workflow, "ci.yml 未升级到 actions/setup-python@v6", failures)
+    require("actions/upload-artifact@v5" in ci_workflow, "ci.yml 未升级到 actions/upload-artifact@v5", failures)
+    require("runs-on: windows-2025" in ci_workflow, "ci.yml 未固定到 windows-2025 runner", failures)
+
+    require("actions/checkout@v5" in release_workflow, "release.yml 未升级到 actions/checkout@v5", failures)
+    require("actions/setup-python@v6" in release_workflow, "release.yml 未升级到 actions/setup-python@v6", failures)
+    require("actions/upload-artifact@v5" in release_workflow, "release.yml 未升级到 actions/upload-artifact@v5", failures)
+    require("runs-on: windows-2025" in release_workflow, "release.yml 未固定到 windows-2025 runner", failures)
+    require("python tools/check_release_tag.py" in release_workflow, "release.yml 缺少 tag/version 强校验步骤", failures)
+    require("python tools/generate_release_notes.py" in release_workflow, "release.yml 缺少自动生成 release notes 步骤", failures)
+    require("body_path: release_notes.md" in release_workflow, "release.yml 未把 release_notes.md 附加到 GitHub Release", failures)
 
     stale_release_refs = sorted(
         {

@@ -252,27 +252,37 @@ python build_release.py
 仓库已内置两条基础流水线：
 
 - `.github/workflows/ci.yml`
-  - 在 `push main/master` 与 `pull_request` 时运行
+  - 在任意 `push` 与 `pull_request` 时运行
   - 自动执行：
     - `python tools/check_release_consistency.py`
     - `python tools/run_test_audit.py`
+  - 固定使用 `windows-2025` runner，并统一 `PYTHONIOENCODING=utf-8`
   - 上传 `test_reports/latest_test_report.md` 作为 artifact
 
 - `.github/workflows/release.yml`
   - 在推送 `v*` tag 或手动触发时运行
   - 自动执行：
     - 一致性检查
+    - `tag == desktop_agent.version.APP_VERSION` 强校验
     - 编译检查 / 单元测试 / GUI smoke test / CLI smoke test
     - `python build_release.py`
     - `python tools/package_release_zip.py`
-  - 上传发布目录、zip 包和测试报告
-  - 如果是 `v*` tag，会自动把 zip 包和测试报告附加到 GitHub Release
+    - `python tools/generate_release_notes.py`
+  - 上传发布目录、zip 包、测试报告和 `release_notes.md`
+  - 如果是 `v*` tag，会自动把 zip 包、测试报告和 release notes 附加到 GitHub Release
 
 本地也可以直接运行同一套基线检查：
 
 ```bash
 python tools/check_release_consistency.py
 python tools/run_test_audit.py
+```
+
+如果准备正式发版，推荐再手动运行：
+
+```bash
+python tools/check_release_tag.py
+python tools/generate_release_notes.py
 ```
 
 ---
