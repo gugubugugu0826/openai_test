@@ -33,7 +33,7 @@ def create_human_review():
     for item in plan["items"]:
         ai_category = item.get("category", "无法判断")
 
-        review["items"].append({
+        review_item = {
             "enabled": True,
             "path": item.get("path"),
             "name": item.get("name"),
@@ -41,7 +41,12 @@ def create_human_review():
             "ai_category": ai_category,
             "human_category": ai_category,
             "reason": item.get("reason", "")
-        })
+        }
+
+        if item.get("desktop_root"):
+            review_item["desktop_root"] = item.get("desktop_root")
+
+        review["items"].append(review_item)
 
     save_json(REVIEW_FILE, review)
 

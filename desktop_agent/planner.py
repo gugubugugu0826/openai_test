@@ -69,7 +69,7 @@ def item_search_text(item):
 
 
 def build_result(item, category, reason, classified_by):
-    return {
+    result = {
         "path": item["path"],
         "name": item["name"],
         "type": item["type"],
@@ -77,6 +77,11 @@ def build_result(item, category, reason, classified_by):
         "reason": reason,
         "classified_by": classified_by
     }
+
+    if item.get("desktop_root"):
+        result["desktop_root"] = item["desktop_root"]
+
+    return result
 
 
 def rule_classify_item(item):
@@ -127,8 +132,24 @@ def rule_classify_item(item):
         return None
 
     if item_type == "file":
+        # Unambiguous binary formats: suffix always wins regardless of filename keywords
+        if suffix in VIDEO_AUDIO_EXTS:
+            return build_result(item, "视频音频", "视频/音频文件后缀", "rule")
+
+        if suffix in ARCHIVE_EXTS:
+            return build_result(item, "压缩包", "压缩包文件后缀", "rule")
+
+        if suffix in INSTALLER_EXTS:
+            return build_result(item, "安装包", "安装包文件后缀", "rule")
+
+        if suffix in CODE_EXTS:
+            return build_result(item, "代码项目", "代码/数据项目文件后缀", "rule")
+
+        # Keyword matching for document-type formats (.pdf, .docx, .txt, etc.)
+        # Image suffix is checked after keywords so that named scans (passport_scan.jpg)
+        # are categorised by semantic intent rather than format.
         if contains_any(text, [
-            "assignment", "assign", "a1", "a2", "report", "essay", "paper",
+            "assignment", "assign", "report", "essay", "paper",
             "submission", "final report", "作业", "报告", "论文", "查重", "降重"
         ]):
             return build_result(item, "作业报告", "文件名或内容摘要包含作业/报告关键词", "rule_content")
@@ -152,18 +173,6 @@ def rule_classify_item(item):
         if suffix in IMAGE_EXTS:
             return build_result(item, "图片截图", "图片文件后缀", "rule")
 
-        if suffix in VIDEO_AUDIO_EXTS:
-            return build_result(item, "视频音频", "视频/音频文件后缀", "rule")
-
-        if suffix in ARCHIVE_EXTS:
-            return build_result(item, "压缩包", "压缩包文件后缀", "rule")
-
-        if suffix in INSTALLER_EXTS:
-            return build_result(item, "安装包", "安装包文件后缀", "rule")
-
-        if suffix in CODE_EXTS:
-            return build_result(item, "代码项目", "代码/数据项目文件后缀", "rule")
-
         if contains_any(text, ["新建", "untitled", "未命名", "111111", "1212"]):
             return build_result(item, "临时文件", "文件名像临时文件", "rule")
 
@@ -185,7 +194,7 @@ def rule_classify_item(item):
             return build_result(item, "课程资料", "文件夹名或内部摘要包含课程代码/课程资料关键词", "rule_folder_content")
 
         if contains_any(text, [
-            "assignment", "ass", "a1", "a2", "report", "essay", "作业", "报告", "论文"
+            "assignment", "report", "essay", "作业", "报告", "论文"
         ]):
             return build_result(item, "作业报告", "文件夹名或内部摘要包含作业/报告关键词", "rule_folder_content")
 

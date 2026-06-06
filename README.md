@@ -3,7 +3,7 @@
 > 一个 Windows 桌面文件整理工具：扫描桌面 → AI 自动分类 → 人工确认 → 一键整理。
 > 自带可离线运行的小模型，**无需 Ollama、无需 API Key、无需联网也能用**（规则模式）。
 
-![version](https://img.shields.io/badge/version-v1.0-blue) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![python](https://img.shields.io/badge/python-3.10%2B-green)
+![version](https://img.shields.io/badge/version-v2.0-blue) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![python](https://img.shields.io/badge/python-3.10%2B-green)
 
 ---
 
@@ -48,7 +48,7 @@
 
 ### A. 普通用户（用打包好的发布版）
 
-1. 到本仓库 **[Releases](../../releases)** 下载 `QwenDesktopAgent_v1.0.zip` 并解压。
+1. 到本仓库 **[Releases](../../releases)** 下载 `QwenDesktopAgent_v2.0.zip` 并解压。
 2. 双击 `QwenDesktopAgent.exe`。
 3. 第一次打开会有引导：选整理目录 + 选分类方式；若选「智能分类」且本机没有模型，会让你**下载 / 选择本地模型 / 暂时跳过**。
 4. 进入「整理桌面」页，按 ① 扫描 → ② 查看调整 → ③ 确认整理。
@@ -168,11 +168,13 @@ python desktop_agent_cli.py <command>
 | 字段 | 说明 | 默认 |
 | --- | --- | --- |
 | `llm_provider` | `builtin` / `none` / `ollama` / `openai_compatible` | `builtin`（发布版） |
-| `desktop_path` | 扫描路径，留空 = 当前用户桌面 | 空 |
+| `desktop_path` | 扫描路径，留空 = 当前用户桌面 + 公用桌面（匹配 Windows 实际桌面显示） | 空 |
 | `normal_target_root` | 整理目标目录 | `D:\Desktop_Sorted` |
 | `folder_mode` | `copy`（推荐，保留原文件）或 `move` | `copy` |
 | `batch_size` | 每批送 AI 的数量 | `8` |
 | `max_internal_items_per_folder` | 文件夹内部采样数量 | `200` |
+| `update_manifest_url` | 远程更新清单地址，指向 `latest.json` | 空 |
+| `auto_check_updates` | 启动时是否自动检查更新 | `true` |
 | `builtin_model_path` | 内置模型路径 | `models\qwen-small.gguf` |
 | `builtin_server_path` | llama-server 路径 | `runtime\llama-server.exe` |
 | `builtin_server_host` / `builtin_server_port` | 内置服务地址 | `127.0.0.1` / `18080` |
@@ -188,6 +190,38 @@ python desktop_agent_cli.py <command>
 > ```
 > 程序会优先读取该环境变量。诊断报告会自动隐藏 Key。
 
+### 远程更新清单
+
+如果你希望发布版自动检查并获取更新包，可以把 `update_manifest_url` 配成 GitHub Releases 最新发布 API：
+
+```text
+https://api.github.com/repos/<你的用户名>/<你的仓库名>/releases/latest
+```
+
+本项目当前可用地址：
+
+```text
+https://api.github.com/repos/gugubugugu0826/openai_test/releases/latest
+```
+
+然后每次发布新版时，在 GitHub Releases 里创建新版本，并上传 `QwenDesktopAgent_v1.1.zip` 这类 zip 更新包。程序会自动读取 Release 的版本号、更新说明和 zip 下载地址。
+
+也可以使用你自己的 JSON 地址，例如 GitHub Raw、对象存储或 CDN。
+
+`latest.json` 示例：
+
+```json
+{
+  "version": "v2.1",
+  "package_url": "https://example.com/QwenDesktopAgent_v2.1.zip",
+  "package_name": "QwenDesktopAgent_v2.1.zip",
+  "sha256": "可选：更新包 sha256",
+  "notes": "修复公用桌面扫描，优化分类体验"
+}
+```
+
+程序会比较 `version` 和当前版本，发现新版本后下载 zip 到 `updates/` 目录。由于 Windows 正在运行的 exe 不能安全覆盖，当前流程是“自动获取更新包 + 提示用户关闭程序后解压运行新版”。
+
 ---
 
 ## 打包发布
@@ -199,13 +233,15 @@ pip install -r requirements.txt
 python build_release.py
 ```
 
-产物在 `QwenDesktopAgent_v1.0/`，主程序 `QwenDesktopAgent.exe`。脚本会：
+产物在 `QwenDesktopAgent_v2.0/`，主程序 `QwenDesktopAgent.exe`。脚本会：
 
 - 用 PyInstaller `--onedir --windowed` 打包；
 - 复制 `runtime/`（AI 引擎，体积小，始终打包）；
 - 按 `BUNDLE_MODEL` 决定是否打包 `models/`（**默认 False**，让安装包更小，模型首次运行再获取）；
 - 把 `config.release.json` 生成为发布版 `config.json`，并写入模型下载地址、开启首次引导、清空 API Key；
 - 打包前自动结束残留的 `llama-server.exe` / 旧程序进程，避免目录占用导致删除/打包失败。
+
+发布到 GitHub：源码进仓库，**把 `QwenDesktopAgent_v2.0` 压成 zip 上传到 [Releases](../../releases)**，不要把成品/模型塞进代码树。
 
 > 关键打包开关（`build_release.py` 顶部）：
 > - `BUNDLE_MODEL`：是否把大模型一起打包（默认 False）
@@ -217,7 +253,15 @@ python build_release.py
 
 ```
 .
-├─ desktop_agent_gui.py          # 图形界面（主程序入口）
+├─ desktop_agent_gui.py          # 图形界面入口（只导入 desktop_agent_ui.app.main）
+├─ desktop_agent_ui/             # GUI 包
+│  ├─ app.py                     # GUI 主应用 / 导航 / 生命周期
+│  ├─ dialogs.py                 # 首次引导、模型获取、下载进度弹窗
+│  ├─ pages_review.py            # 整理方案 Review 表格页
+│  ├─ pages_help.py              # 帮助页相关的更新检查逻辑
+│  ├─ utils.py                   # GUI 工具函数
+│  ├─ theme.py                   # 颜色常量
+│  └─ pages_*.py                 # Dashboard / Workflow / Config / Memory / Explanation / Logs 等页面
 ├─ desktop_agent_cli.py          # 命令行入口
 ├─ build_release.py              # 打包脚本
 ├─ requirements.txt              # 依赖：customtkinter / requests / pyinstaller
@@ -288,4 +332,3 @@ A：规则模式（none）完全离线。builtin 模式只在首次下载模型�
 - [hf-mirror.com](https://hf-mirror.com) 公益镜像，便利国内下载
 
 ---
-

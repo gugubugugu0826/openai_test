@@ -6,6 +6,7 @@ from pathlib import Path
 
 from desktop_agent.config import load_config
 from desktop_agent.builtin_llm import get_builtin_config, is_builtin_server_ready, validate_builtin_files
+from desktop_agent.scanner import get_scan_roots
 
 
 def get_provider():
@@ -38,12 +39,18 @@ def check_config():
 def check_desktop_path():
     try:
         config = load_config()
-        desktop = Path(config["desktop_path"])
+        desktops = get_scan_roots(config)
+        invalid = [
+            str(desktop)
+            for desktop in desktops
+            if not desktop.exists() or not desktop.is_dir()
+        ]
 
-        if desktop.exists() and desktop.is_dir():
-            return True, f"扫描路径存在：{desktop}"
+        if not invalid:
+            paths = ", ".join(str(desktop) for desktop in desktops)
+            return True, f"扫描路径存在：{paths}"
 
-        return False, f"扫描路径不存在：{desktop}"
+        return False, f"扫描路径不存在：{', '.join(invalid)}"
     except Exception as e:
         return False, f"扫描路径检查失败：{e}"
 

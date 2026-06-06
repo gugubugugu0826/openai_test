@@ -44,14 +44,19 @@ def load_execution_items():
             if category not in CATEGORIES:
                 category = "无法判断"
 
-            items.append({
+            execution_item = {
                 "path": item["path"],
                 "name": item["name"],
                 "type": item["type"],
                 "category": category,
                 "human_category": category,
                 "reason": item.get("reason", "")
-            })
+            }
+
+            if item.get("desktop_root"):
+                execution_item["desktop_root"] = item.get("desktop_root")
+
+            items.append(execution_item)
 
         return items, REVIEW_FILE
 
@@ -68,7 +73,7 @@ def get_target_path(item):
 
     if item_type == "shortcut":
         folder = SHORTCUT_CATEGORY_FOLDERS.get(category, "99_其他快捷方式")
-        return Path(config["desktop_path"]) / folder / src.name
+        return src.parent / folder / src.name
 
     folder = NORMAL_CATEGORY_FOLDERS.get(category, "无法判断")
     return Path(config["normal_target_root"]) / folder / src.name
@@ -113,7 +118,7 @@ def dryrun_plan():
     update_state("last_dryrun_at", "完成行动预演")
 
 
-def apply_plan():
+def apply_plan(confirm_callback=None):
     if not Path(REVIEW_FILE).exists() and not Path(PLAN_FILE).exists():
         print("缺少执行来源。请先运行：python desktop_agent_cli.py preview")
         return
@@ -121,11 +126,15 @@ def apply_plan():
     if not Path(REVIEW_FILE).exists():
         print("警告：没有检测到人工审核文件 desktop_human_review.json。")
         print("建议先运行：python desktop_agent_cli.py review")
-        confirm = input("仍然继续执行原始计划？输入 YES 继续：")
-
-        if confirm != "YES":
-            print("已取消执行。")
-            return
+        if confirm_callback is not None:
+            if not confirm_callback():
+                print("已取消执行。")
+                return
+        else:
+            confirm = input("仍然继续执行原始计划？输入 YES 继续：")
+            if confirm != "YES":
+                print("已取消执行。")
+                return
 
     config = load_config()
     items, source_file = load_execution_items()

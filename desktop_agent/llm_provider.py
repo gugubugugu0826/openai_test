@@ -77,7 +77,7 @@ def fallback_without_llm(item, reason):
     else:
         category = "无法判断"
 
-    return {
+    result = {
         "path": item["path"],
         "name": item["name"],
         "type": item["type"],
@@ -85,6 +85,11 @@ def fallback_without_llm(item, reason):
         "reason": reason,
         "classified_by": "no_llm"
     }
+
+    if item.get("desktop_root"):
+        result["desktop_root"] = item["desktop_root"]
+
+    return result
 
 
 def normalize_model_results(raw_results, batch, classified_by):
@@ -101,14 +106,19 @@ def normalize_model_results(raw_results, batch, classified_by):
         if category not in CATEGORIES:
             category = "无法判断"
 
-        final_results.append({
+        result = {
             "path": original["path"],
             "name": original["name"],
             "type": original["type"],
             "category": category,
             "reason": r.get("reason", ""),
             "classified_by": classified_by
-        })
+        }
+
+        if original.get("desktop_root"):
+            result["desktop_root"] = original["desktop_root"]
+
+        final_results.append(result)
 
     existing_paths = {x["path"] for x in final_results}
 

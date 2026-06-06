@@ -8,6 +8,7 @@ build/
 dist/
 *.spec
 QwenDesktopAgent_*/
+QwenDesktopAgent_*.zip
 *.exe
 
 # ---------- 大文件 / 第三方二进制（太大，文档说明从哪获取，发布走 Releases）----------
@@ -22,6 +23,7 @@ config.json
 logs/
 *.log
 diagnostic_reports/
+updates/
 desktop_observation.json
 desktop_agent_plan.json
 desktop_human_review.json
@@ -42,6 +44,9 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# ---------- 测试报告（由脚本生成，不入库）----------
+test_reports/
 
 # ---------- 编辑器 / 系统 ----------
 .vscode/
