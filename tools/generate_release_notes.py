@@ -1,4 +1,5 @@
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -45,8 +46,46 @@ def parse_test_summary():
     }
 
 
+def run_git_command(args):
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if result.returncode != 0:
+            return ""
+        return result.stdout.strip()
+    except Exception:
+        return ""
+
+
+def build_changelog_lines():
+    previous_tag = run_git_command(["describe", "--tags", "--abbrev=0", "HEAD^"])
+    if previous_tag:
+        log_text = run_git_command(["log", "--oneline", f"{previous_tag}..HEAD"])
+    else:
+        log_text = run_git_command(["log", "--oneline", "-n", "10"])
+
+    if not log_text:
+        return ["- 未获取到最近提交记录。"]
+
+    lines = []
+    for raw in log_text.splitlines():
+        parts = raw.strip().split(" ", 1)
+        if len(parts) == 2:
+            commit_sha, message = parts
+            lines.append(f"- `{commit_sha}` {message}")
+        else:
+            lines.append(f"- {raw.strip()}")
+    return lines[:12]
+
+
 def main():
     summary = parse_test_summary()
+    changelog_lines = build_changelog_lines()
     zip_name = f"{APP_EXE_NAME}_{APP_VERSION}.zip"
     release_dir = f"{APP_EXE_NAME}_{APP_VERSION}"
 
@@ -63,11 +102,17 @@ def main():
         "",
         *summary["summary_lines"],
         "",
+        "## 本次变更摘要",
+        "",
+        *changelog_lines,
+        "",
         "## 附件",
         "",
         f"- `{zip_name}`",
         "- `test_reports/latest_test_report.md`",
         "- `release_notes.md`",
+        "- `release_manifest.json`",
+        "- `release_manifest.md`",
         "",
         "## 使用方式",
         "",

@@ -268,8 +268,10 @@ python build_release.py
     - `python build_release.py`
     - `python tools/package_release_zip.py`
     - `python tools/generate_release_notes.py`
-  - 上传发布目录、zip 包、测试报告和 `release_notes.md`
-  - 如果是 `v*` tag，会自动把 zip 包、测试报告和 release notes 附加到 GitHub Release
+    - `python tools/generate_release_manifest.py`
+  - 上传发布目录、zip 包、测试报告、`release_notes.md`、`release_manifest.json`、`release_manifest.md`
+  - 会把 release notes 与 manifest 写入 GitHub Actions job summary
+  - 如果是 `v*` tag，会自动把 zip 包、测试报告、release notes、manifest 附加到 GitHub Release
 
 本地也可以直接运行同一套基线检查：
 
@@ -283,6 +285,7 @@ python tools/run_test_audit.py
 ```bash
 python tools/check_release_tag.py
 python tools/generate_release_notes.py
+python tools/generate_release_manifest.py
 ```
 
 ---

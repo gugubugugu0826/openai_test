@@ -73,7 +73,11 @@ def main():
     require("runs-on: windows-2025" in release_workflow, "release.yml 未固定到 windows-2025 runner", failures)
     require("python tools/check_release_tag.py" in release_workflow, "release.yml 缺少 tag/version 强校验步骤", failures)
     require("python tools/generate_release_notes.py" in release_workflow, "release.yml 缺少自动生成 release notes 步骤", failures)
+    require("python tools/generate_release_manifest.py" in release_workflow, "release.yml 缺少 release manifest 生成步骤", failures)
     require("body_path: release_notes.md" in release_workflow, "release.yml 未把 release_notes.md 附加到 GitHub Release", failures)
+    require("release_manifest.json" in release_workflow, "release.yml 未附加 release_manifest.json", failures)
+    require("release_manifest.md" in release_workflow, "release.yml 未附加 release_manifest.md", failures)
+    require("GITHUB_STEP_SUMMARY" in release_workflow, "release.yml 未写入 workflow summary", failures)
 
     stale_release_refs = sorted(
         {

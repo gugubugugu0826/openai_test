@@ -64,6 +64,21 @@ jobs:
       - name: Generate release notes
         run: python tools/generate_release_notes.py
 
+      - name: Generate release manifest
+        run: python tools/generate_release_manifest.py
+
+      - name: Write workflow summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path release_notes.md) {
+            Get-Content release_notes.md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          if (Test-Path release_manifest.md) {
+            "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Get-Content release_manifest.md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
       - name: Upload release artifacts
         if: always()
         uses: actions/upload-artifact@v5
@@ -74,6 +89,8 @@ jobs:
             QwenDesktopAgent_v*
             test_reports/latest_test_report.md
             release_notes.md
+            release_manifest.json
+            release_manifest.md
           if-no-files-found: warn
 
       - name: Publish GitHub Release Assets
@@ -85,3 +102,5 @@ jobs:
             QwenDesktopAgent_v*.zip
             test_reports/latest_test_report.md
             release_notes.md
+            release_manifest.json
+            release_manifest.md
