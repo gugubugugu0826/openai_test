@@ -205,7 +205,7 @@ https://api.github.com/repos/<你的用户名>/<你的仓库名>/releases/latest
 https://api.github.com/repos/gugubugugu0826/openai_test/releases/latest
 ```
 
-然后每次发布新版时，在 GitHub Releases 里创建新版本，并上传 `QwenDesktopAgent_v2.0.zip` 这类 zip 更新包。程序会自动读取 Release 的版本号、更新说明和 zip 下载地址。
+然后每次发布新版时，在 GitHub Releases 里创建新版本，并上传 `QwenDesktopAgent_v2.1.zip` 这类 zip 更新包。程序会自动读取 Release 的版本号、更新说明和 zip 下载地址。
 
 也可以使用你自己的 JSON 地址，例如 GitHub Raw、对象存储或 CDN。
 

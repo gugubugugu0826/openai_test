@@ -86,7 +86,7 @@ try:
     from desktop_agent.version import APP_NAME, APP_VERSION
 except Exception:
     APP_NAME = "Qwen Desktop Organizer Agent"
-    APP_VERSION = "v2.0"
+    APP_VERSION = "v2.1"
 
 # 关闭程序时用于停止内置 llama-server（避免它占用文件导致目录删不掉）
 try:
