@@ -9,7 +9,9 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
+from desktop_agent.i18n import get_language
 from desktop_agent_ui.theme import *
+
 
 PROJECT_DIR = Path.cwd()
 CONFIG_FILE = Path("config.json")
@@ -31,11 +33,14 @@ except Exception:
 
 
 class LogsPageMixin:
+    def _lang(self, zh, en):
+        return en if get_language() == "en" else zh
+
     def build_logs_page(self, parent):
         self.page_header(
             parent,
             "运行日志",
-            "查看运行输出、打开日志文件、生成错误报告。",
+            "查看运行输出、打开日志文件、生成诊断报告。",
         )
 
         body = ctk.CTkFrame(parent, fg_color="transparent")
@@ -47,8 +52,8 @@ class LogsPageMixin:
         summary.grid(row=0, column=0, padx=6, pady=(6, 8), sticky="ew")
         summary.grid_columnconfigure(0, weight=1)
 
-        self.log_status_var = ctk.StringVar(value="运行输出会实时显示在下方日志窗口。")
-        self.log_file_var = ctk.StringVar(value="当前日志文件：尚未创建")
+        self.log_status_var = ctk.StringVar(value=self._default_logs_status())
+        self.log_file_var = ctk.StringVar(value=self._default_log_file_text())
 
         ctk.CTkLabel(
             summary,
@@ -75,45 +80,26 @@ class LogsPageMixin:
 
         actions = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         actions.grid(row=1, column=0, padx=6, pady=6, sticky="ew")
-        actions.grid_columnconfigure(0, weight=1)
 
         action_row = ctk.CTkFrame(actions, fg_color="transparent")
         action_row.grid(row=0, column=0, padx=12, pady=12, sticky="w")
 
-        ctk.CTkButton(
-            action_row,
-            text="打开 logs 文件夹",
-            corner_radius=8,
-            width=150,
-            command=self.open_logs_folder,
-        ).grid(row=0, column=0, padx=(0, 10))
-        ctk.CTkButton(
-            action_row,
-            text="打开当前日志",
-            corner_radius=8,
-            width=150,
-            command=self.open_current_log_file,
-        ).grid(row=0, column=1, padx=(0, 10))
-        ctk.CTkButton(
-            action_row,
-            text="生成错误报告包",
-            corner_radius=8,
-            width=160,
-            command=self.create_diagnostic_report,
-        ).grid(row=0, column=2, padx=(0, 10))
-        ctk.CTkButton(
-            action_row,
-            text="清空输出窗口",
-            corner_radius=8,
-            width=150,
-            fg_color="#6b7280",
-            hover_color="#4b5563",
-            command=self.clear_output,
-        ).grid(row=0, column=3)
+        button_specs = [
+            ("打开 logs 文件夹", self.open_logs_folder, None),
+            ("打开当前日志", self.open_current_log_file, None),
+            ("生成错误报告包", self.create_diagnostic_report, None),
+            ("清空输出窗口", self.clear_output, "#6b7280"),
+        ]
+        for idx, (text, command, color) in enumerate(button_specs):
+            kwargs = {"text": text, "corner_radius": 8, "width": 170, "command": command}
+            if color:
+                kwargs["fg_color"] = color
+                kwargs["hover_color"] = "#4b5563"
+            ctk.CTkButton(action_row, **kwargs).grid(row=0, column=idx, padx=(0, 10))
 
         console_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         console_card.grid(row=2, column=0, padx=6, pady=8, sticky="nsew")
-        console_card.grid_rowconfigure(1, weight=1)
+        console_card.grid_rowconfigure(2, weight=1)
         console_card.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -124,9 +110,11 @@ class LogsPageMixin:
         ).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
         ctk.CTkLabel(
             console_card,
-            text="这里会显示扫描、生成方案、应用整理和模型运行过程中的输出。",
+            text=self._console_intro_text(),
             font=("Microsoft YaHei UI", 11),
             text_color=COL_TEXT_MUTED,
+            wraplength=980,
+            justify="left",
         ).grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
 
         console_surface = ctk.CTkFrame(console_card, fg_color="#111827", corner_radius=12)
@@ -146,18 +134,33 @@ class LogsPageMixin:
 
         self.refresh_logs_summary()
 
+    def _default_logs_status(self):
+        if get_language() == "en":
+            return "Runtime output appears below in real time. It is a good idea to skim the key lines before you run Apply."
+        return "运行输出会实时显示在下方日志窗口。建议在执行 Apply 前先看一遍关键输出。"
+
+    def _default_log_file_text(self):
+        if get_language() == "en":
+            return "Current log file: not created yet"
+        return "当前日志文件：尚未创建"
+
+    def _console_intro_text(self):
+        if get_language() == "en":
+            return "This panel shows scan, planning, apply, and model-runtime output."
+        return "这里会显示扫描、生成方案、应用整理和模型运行过程中的输出。"
+
     def refresh_logs_summary(self):
         if hasattr(self, "log_status_var"):
-            self.log_status_var.set("运行输出会实时显示在下方日志窗口。建议在执行 Apply 前先看一遍关键输出。")
+            self.log_status_var.set(self._default_logs_status())
         if hasattr(self, "log_file_var"):
             if getattr(self, "current_log_file", None):
-                self.log_file_var.set(f"当前日志文件：{self.current_log_file}")
+                prefix = "Current log file: " if get_language() == "en" else "当前日志文件："
+                self.log_file_var.set(f"{prefix}{self.current_log_file}")
             else:
-                self.log_file_var.set("当前日志文件：尚未创建")
+                self.log_file_var.set(self._default_log_file_text())
 
     def sanitize_config_for_report(self, config):
         safe_config = dict(config)
-
         for key in [
             "api_key",
             "openai_api_key",
@@ -169,7 +172,6 @@ class LogsPageMixin:
         ]:
             if key in safe_config and safe_config[key]:
                 safe_config[key] = "***REDACTED***"
-
         return safe_config
 
     def create_diagnostic_report(self):
@@ -227,12 +229,15 @@ class LogsPageMixin:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
             messagebox.showinfo(
-                "错误报告已生成",
-                f"错误报告包已生成：\n{report_zip}\n\n里面的 config 已自动隐藏 API Key。",
+                self._lang("错误报告已生成", "Diagnostic Report Created"),
+                self._lang(
+                    f"错误报告包已生成：\n{report_zip}\n\n里面的 config 已自动隐藏 API Key。",
+                    f"Diagnostic report created:\n{report_zip}\n\nAPI keys have been automatically redacted."
+                ),
             )
             subprocess.Popen(f'explorer "{reports_dir}"')
         except Exception as e:
-            messagebox.showerror("生成错误报告失败", str(e))
+            messagebox.showerror(self._lang("生成错误报告失败", "Report Creation Failed"), str(e))
 
     def open_project_folder(self):
         try:
@@ -246,16 +251,21 @@ class LogsPageMixin:
             target_root = config.get("normal_target_root", "").strip()
 
             if not target_root:
-                messagebox.showwarning("目标目录为空", "请先在「设置」里填写整理目标目录。")
+                messagebox.showwarning(
+                    self._lang("目标目录为空", "Target Folder Not Set"),
+                    self._lang("请先在「设置」里填写整理目标目录。", "Please set the target folder in Settings first.")
+                )
                 return
 
             target_path = Path(target_root)
-
             if not target_path.exists():
-                if not messagebox.askyesno("目标目录不存在", f"{target_path}\n\n是否创建？"):
+                if not messagebox.askyesno(
+                    self._lang("目标目录不存在", "Target Folder Not Found"),
+                    self._lang(f"{target_path}\n\n是否创建？", f"{target_path}\n\nCreate it now?")
+                ):
                     return
                 target_path.mkdir(parents=True, exist_ok=True)
 
             subprocess.Popen(f'explorer "{target_path}"')
         except Exception as e:
-            messagebox.showerror("打开整理目标目录失败", str(e))
+            messagebox.showerror(self._lang("打开整理目标目录失败", "Failed to Open Target Folder"), str(e))

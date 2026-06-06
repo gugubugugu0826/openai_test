@@ -49,7 +49,20 @@ EXPLANATION_JSON_FILE = PROJECT_DIR / "desktop_agent_explanation.json"
 # Agent Core Imports
 # =====================================================
 
+from desktop_agent.categories import CATEGORIES
 from desktop_agent.healthcheck import print_healthcheck, run_healthcheck
+from desktop_agent.i18n import (
+    get_category_display,
+    get_category_display_options,
+    get_language,
+    get_language_by_label,
+    get_language_label,
+    install_runtime_output_translation,
+    is_english,
+    patch_customtkinter,
+    set_language,
+    t,
+)
 from desktop_agent.scanner import scan_desktop
 from desktop_agent.planner import preview_plan
 from desktop_agent.reviewer import create_human_review, learn_from_review
@@ -107,28 +120,6 @@ COL_WARN_SOFT   = "#fffbeb"
 COL_WARN_TEXT   = "#b45309"
 COL_DANGER      = "#dc2626"
 COL_BORDER      = "#e5e7eb"
-
-
-CATEGORIES = [
-    "课程资料",
-    "代码项目",
-    "作业报告",
-    "简历求职",
-    "证件合同",
-    "图片截图",
-    "视频音频",
-    "压缩包",
-    "安装包",
-    "游戏相关",
-    "临时文件",
-    "浏览器通讯",
-    "办公学习",
-    "系统工具",
-    "影音娱乐",
-    "网盘VPN",
-    "其他快捷方式",
-    "无法判断",
-]
 
 
 # 默认演示记忆：让用户第一次打开「整理记忆」就能看到“命中关键词→分类”的样子。
@@ -205,9 +196,15 @@ class DesktopAgentGUI(
 
     def __init__(self, root):
         self.root = root
-        self.root.title(f"{APP_NAME} {APP_VERSION}")
+        self.ensure_config_exists_for_startup()
+        initial_config = self.read_config_safely()
+        set_language(initial_config.get("ui_language"))
+        patch_customtkinter(ctk)
+        install_runtime_output_translation()
+
+        self.root.title(f"{t(APP_TITLE)} {APP_VERSION}")
         self.root.geometry("1320x840")
-        self.root.minsize(1120, 720)
+        self.root.minsize(1180 if is_english() else 1120, 720)
 
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
@@ -238,11 +235,9 @@ class DesktopAgentGUI(
         self.nav_indicators = {}
 
         self.review_items = []
-        self.review_filter_var = tk.StringVar(value="全部")
+        self.review_filter_var = tk.StringVar(value=t("全部"))
         self.config_vars = {}
         self.dashboard_vars = {}
-
-        self.ensure_config_exists_for_startup()
         self.init_log_file()
 
         self.build_ui()
@@ -270,6 +265,7 @@ class DesktopAgentGUI(
         return {
             "first_run_completed": first_run_completed,
             "llm_provider": provider,
+            "ui_language": get_language(),
 
             "model": "qwen2.5-coder:14b",
             "ollama_url": "http://localhost:11434/api/generate",
@@ -315,7 +311,11 @@ class DesktopAgentGUI(
 
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+            default_config = self.get_default_config()
+            if isinstance(data, dict):
+                default_config.update(data)
+            return default_config
         except Exception:
             return self.get_default_config()
 
@@ -361,7 +361,11 @@ class DesktopAgentGUI(
         self.output_text.delete("1.0", "end")
         self.write_log("\n[GUI] Output window cleared.\n")
         if hasattr(self, "log_status_var"):
-            self.log_status_var.set("输出窗口已清空。新的运行输出会继续显示在下方。")
+            self.log_status_var.set(
+                "Output cleared. New runtime output will appear below."
+                if is_english() else
+                "输出窗口已清空。新的运行输出会继续显示在下方。"
+            )
 
     def open_logs_folder(self):
         try:
@@ -372,7 +376,10 @@ class DesktopAgentGUI(
 
     def open_current_log_file(self):
         if not self.current_log_file or not self.current_log_file.exists():
-            messagebox.showwarning("没有日志文件", "当前日志文件不存在。")
+            messagebox.showwarning(
+                "没有日志文件" if not is_english() else "No Log File",
+                "当前日志文件不存在。" if not is_english() else "The current log file does not exist."
+            )
             return
 
         try:
@@ -389,7 +396,8 @@ class DesktopAgentGUI(
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self.root, width=232, corner_radius=0, fg_color=COL_SIDEBAR)
+        sidebar_width = 272 if is_english() else 232
+        self.sidebar = ctk.CTkFrame(self.root, width=sidebar_width, corner_radius=0, fg_color=COL_SIDEBAR)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
@@ -435,7 +443,7 @@ class DesktopAgentGUI(
 
         ctk.CTkLabel(
             self.sidebar,
-            text=APP_TITLE,
+            text=t(APP_TITLE),
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COL_TEXT,
             anchor="w",
@@ -469,7 +477,7 @@ class DesktopAgentGUI(
 
         ctk.CTkLabel(
             self.sidebar,
-            text="高级",
+            text=t("高级"),
             text_color="#9ca3af",
             font=ctk.CTkFont(size=11),
             anchor="w",
@@ -483,12 +491,12 @@ class DesktopAgentGUI(
         self.sidebar.grid_rowconfigure(r, weight=1)
         r += 1
 
-        self.status_var = tk.StringVar(value="就绪")
+        self.status_var = tk.StringVar(value=t("就绪"))
         ctk.CTkLabel(
             self.sidebar,
             textvariable=self.status_var,
             text_color=COL_TEXT_MUTED,
-            wraplength=190,
+            wraplength=230 if is_english() else 190,
             anchor="w",
             font=ctk.CTkFont(size=12),
         ).grid(row=r, column=0, padx=18, pady=(10, 4), sticky="sw")
@@ -547,9 +555,38 @@ class DesktopAgentGUI(
             text=subtitle,
             font=ctk.CTkFont(size=14),
             text_color=COL_TEXT_MUTED,
+            wraplength=960,
+            justify="left",
         ).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
+        lang_label = "ENG" if get_language() == "zh" else "中文"
+        ctk.CTkButton(
+            header,
+            text=lang_label,
+            width=56,
+            height=28,
+            corner_radius=8,
+            fg_color="transparent",
+            border_width=1,
+            border_color=COL_BORDER,
+            text_color=COL_TEXT_MUTED,
+            hover_color=COL_HOVER,
+            command=self._toggle_language,
+        ).grid(row=0, column=1, rowspan=2, padx=(8, 0), sticky="ne")
+
         return header
+
+    def _toggle_language(self):
+        new_lang = "en" if get_language() == "zh" else "zh"
+        set_language(new_lang)
+        config = self.read_config_safely()
+        config["ui_language"] = new_lang
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+        self.rebuild_window_for_language(self.current_page or "Home")
 
     def make_card(self, parent, row, column, title=None, columnspan=1):
         card = ctk.CTkFrame(parent, fg_color=COL_CARD, corner_radius=14)
@@ -634,6 +671,54 @@ class DesktopAgentGUI(
         elif page_name == "Settings":
             self.load_config_panel()
 
+    def get_language_display_options(self):
+        return [get_language_label(language) for language in ("zh", "en")]
+
+    def get_current_language_label(self):
+        return get_language_label(get_language())
+
+    def get_category_display_options(self, include_all=False):
+        options = get_category_display_options(CATEGORIES)
+        if include_all:
+            return [t("全部")] + options
+        return options
+
+    def display_to_category(self, display_value):
+        if display_value in ("", None):
+            return display_value
+        if display_value == t("全部"):
+            return "全部"
+        for category in CATEGORIES:
+            if display_value == get_category_display(category):
+                return category
+        return display_value
+
+    def category_to_display(self, category):
+        if category in ("全部", t("全部")):
+            return t("全部")
+        return get_category_display(category)
+
+    def rebuild_window_for_language(self, target_page="Settings"):
+        self.root.title(f"{t(APP_TITLE)} {APP_VERSION}")
+        self.root.minsize(1180 if is_english() else 1120, 720)
+
+        for child in list(self.root.winfo_children()):
+            child.destroy()
+
+        self.pages = {}
+        self.nav_buttons = {}
+        self.nav_indicators = {}
+        self.review_items = []
+        self.review_check_vars = {}
+        self.config_vars = {}
+        self.dashboard_vars = {}
+        self.review_filter_var = tk.StringVar(value=t("全部"))
+
+        self.build_ui()
+        self.show_page(target_page)
+        self.update_home_summary()
+        self.refresh_home_status()
+
     # =====================================================
     # Home Page (整理桌面 —— 引导流程 + 友好检查)
     # =====================================================
@@ -643,11 +728,11 @@ class DesktopAgentGUI(
 
         message = (
             f"{APP_NAME} {APP_VERSION}\n\n"
-            f"当前模式：{config.get('llm_provider')}\n"
-            f"目标目录：{config.get('normal_target_root')}\n"
-            f"folder_mode：{config.get('folder_mode')}\n\n"
-            f"程序目录：\n{PROJECT_DIR}\n\n"
-            f"当前日志：\n{self.current_log_file}\n"
+            f"{t('当前模式：')}{config.get('llm_provider')}\n"
+            f"{t('目标目录：')}{config.get('normal_target_root')}\n"
+            f"{t('folder_mode：')}{config.get('folder_mode')}\n\n"
+            f"{t('程序目录：', default='程序目录：')}\n{PROJECT_DIR}\n\n"
+            f"{t('当前日志：', default='当前日志：')}\n{self.current_log_file}\n"
         )
 
         messagebox.showinfo("About / 关于", message)

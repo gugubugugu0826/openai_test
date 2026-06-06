@@ -6,6 +6,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from desktop_agent.categories import CATEGORIES
+from desktop_agent.i18n import get_category_display, get_language, t
 from desktop_agent_ui.theme import *
 
 REVIEW_FILE = Path("desktop_human_review.json")
@@ -84,10 +85,10 @@ class ReviewPageMixin:
 
         self.review_filter_menu = ctk.CTkOptionMenu(
             filter_bar,
-            values=["全部"] + list(CATEGORIES),
+            values=self.get_category_display_options(include_all=True),
             variable=self.review_filter_var,
             command=lambda _: self.refresh_review_table(),
-            width=160,
+            width=210,
         )
         self.review_filter_menu.pack(side="right", padx=(0, 6))
 
@@ -164,13 +165,14 @@ class ReviewPageMixin:
 
         # 分类 — category dropdown
         c4 = self._rv_cell(row, _RCOLS[4])
-        hvar = tk.StringVar(value=item.get("human_category", item.get("category", "")) or CATEGORIES[0])
+        initial_category = item.get("human_category", item.get("category", "")) or CATEGORIES[0]
+        hvar = tk.StringVar(value=self.category_to_display(initial_category))
         def on_cat(choice, i=index):
-            self.review_items[i]["human_category"] = choice
+            self.review_items[i]["human_category"] = self.display_to_category(choice)
             self.review_dirty = True
             self._update_review_count()
         ctk.CTkOptionMenu(
-            c4, values=CATEGORIES, variable=hvar, command=on_cat, width=166,
+            c4, values=self.get_category_display_options(), variable=hvar, command=on_cat, width=198,
         ).pack(anchor="center", padx=6, expand=True)
 
         # 原因 — horizontally scrollable; mouse-wheel scrolls text, not the parent frame
@@ -200,7 +202,7 @@ class ReviewPageMixin:
             return
 
         self.review_items = data.get("items", [])
-        self.review_filter_var.set("全部")
+        self.review_filter_var.set(t("全部"))
         self.review_dirty = False
         self.refresh_review_table()
 
@@ -217,14 +219,21 @@ class ReviewPageMixin:
         hdr = ctk.CTkFrame(self.review_list, fg_color=COL_HOVER, corner_radius=0, height=34)
         hdr.grid(row=0, column=0, pady=(0, 2), sticky="ew")
         hdr.pack_propagate(False)
-        for width, text in zip(_RCOLS, ["", "启用", "名称", "类型", "分类", "原因"]):
+        for width, text in zip(_RCOLS, [
+            "",
+            self._lang("启用", "Enabled"),
+            self._lang("名称", "Name"),
+            self._lang("类型", "Type"),
+            self._lang("分类", "Category"),
+            self._lang("原因", "Reason"),
+        ]):
             cell = self._rv_cell(hdr, width)
             ctk.CTkLabel(
                 cell, text=text, font=ctk.CTkFont(size=12, weight="bold"),
                 text_color=COL_TEXT_NAV, anchor="w",
             ).pack(anchor="center", fill="x", padx=8, expand=True)
 
-        current_filter = self.review_filter_var.get()
+        current_filter = self.display_to_category(self.review_filter_var.get())
         visible = 0
 
         for index, item in enumerate(self.review_items):
@@ -247,7 +256,10 @@ class ReviewPageMixin:
         total = len(self.review_items)
         enabled = sum(1 for it in self.review_items if it.get("enabled", True))
         checked = sum(1 for v in self.review_check_vars.values() if v.get())
-        self.review_count_var.set(f"共 {total} 项 · 启用 {enabled} · 勾选 {checked}")
+        if t("全部") != "全部":
+            self.review_count_var.set(f"Total {total} items · {enabled} enabled · {checked} selected")
+        else:
+            self.review_count_var.set(f"共 {total} 项 · 启用 {enabled} · 勾选 {checked}")
 
     def save_review_table(self, silent=False):
         if not self.review_items:
@@ -304,17 +316,21 @@ class ReviewPageMixin:
             return
 
         editor = ctk.CTkToplevel(self.root)
-        editor.title("批量修改分类")
+        editor.title(self._lang("批量修改分类", "Bulk Change Category"))
         editor.geometry("360x180")
         editor.transient(self.root)
         editor.grab_set()
 
-        category_var = tk.StringVar(value=CATEGORIES[0])
-        ctk.CTkLabel(editor, text=f"将 {len(indices)} 个项目改为：", font=ctk.CTkFont(size=15, weight="bold")).pack(pady=(24, 10))
-        ctk.CTkOptionMenu(editor, variable=category_var, values=CATEGORIES, width=260).pack(pady=8)
+        category_var = tk.StringVar(value=self.category_to_display(CATEGORIES[0]))
+        ctk.CTkLabel(
+            editor,
+            text=self._lang(f"将 {len(indices)} 个项目改为：", f"Change {len(indices)} items to:"),
+            font=ctk.CTkFont(size=15, weight="bold")
+        ).pack(pady=(24, 10))
+        ctk.CTkOptionMenu(editor, variable=category_var, values=self.get_category_display_options(), width=280).pack(pady=8)
 
         def apply_category():
-            new_category = category_var.get()
+            new_category = self.display_to_category(category_var.get())
             for index in indices:
                 if 0 <= index < len(self.review_items):
                     self.review_items[index]["human_category"] = new_category

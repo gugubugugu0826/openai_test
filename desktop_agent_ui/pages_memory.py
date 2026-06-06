@@ -5,23 +5,25 @@ from tkinter import messagebox, ttk
 
 import customtkinter as ctk
 
+from desktop_agent.categories import CATEGORIES
+from desktop_agent.i18n import get_language
 from desktop_agent_ui.theme import *
 
 MEMORY_FILE = Path("agent_memory.json")
-CATEGORIES = [
-    "课程资料", "代码项目", "作业报告", "简历求职", "证件合同", "图片截图", "视频音频", "压缩包", "安装包",
-    "游戏相关", "临时文件", "浏览器通讯", "办公学习", "系统工具", "影音娱乐", "网盘VPN", "其他快捷方式", "无法判断",
-]
 
 DEFAULT_MEMORY = {
     "rules": [
-        {"match": "简历", "category": "简历求职", "note": "示例规则：文件名含“简历”"},
-        {"match": "发票", "category": "证件合同", "note": "示例规则：含“发票”"},
+        {"match": "简历", "category": "简历求职", "note": "示例规则：文件名含“简历”→简历求职（可删除）"},
+        {"match": "发票", "category": "证件合同", "note": "示例规则：含“发票”→证件合同（可删除）"},
+        {"match": "课程", "category": "课程资料", "note": "示例规则：含“课程”→课程资料（可删除）"},
     ]
 }
 
 
 class MemoryPageMixin:
+    def _lang(self, zh, en):
+        return en if get_language() == "en" else zh
+
     def build_memory_page(self, parent):
         self.page_header(
             parent,
@@ -68,7 +70,7 @@ class MemoryPageMixin:
             ("重新加载", "#6b7280", self.load_memory_panel),
         ]
         for idx, (text, color, command) in enumerate(buttons):
-            kwargs = {"text": text, "corner_radius": 8, "width": 132, "command": command}
+            kwargs = {"text": text, "corner_radius": 8, "width": 140, "command": command}
             if color == COL_DANGER:
                 kwargs["fg_color"] = COL_DANGER
                 kwargs["hover_color"] = "#b91c1c"
@@ -83,8 +85,8 @@ class MemoryPageMixin:
         status_box = ctk.CTkFrame(toolbar, fg_color=COL_BG, corner_radius=12)
         status_box.grid(row=0, column=1, padx=(0, 12), pady=12, sticky="e")
 
-        self.memory_count_var = tk.StringVar(value="0 条规则")
-        self.memory_status_var = tk.StringVar(value="已加载")
+        self.memory_count_var = tk.StringVar(value=self._lang("0 条规则", "0 rules"))
+        self.memory_status_var = tk.StringVar(value=self._lang("已加载", "Loaded"))
 
         ctk.CTkLabel(
             status_box,
@@ -103,6 +105,8 @@ class MemoryPageMixin:
             textvariable=self.memory_status_var,
             font=("Microsoft YaHei UI", 11),
             text_color=COL_TEXT_MUTED,
+            wraplength=180,
+            justify="left",
         ).pack(anchor="w", padx=14, pady=(2, 10))
 
         table_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
@@ -137,8 +141,12 @@ class MemoryPageMixin:
         columns = ("match", "category", "note")
         self.memory_tree = ttk.Treeview(table_surface, columns=columns, show="headings", selectmode="extended")
 
-        headings = {"match": "命中关键词", "category": "归类到", "note": "备注"}
-        widths = {"match": 240, "category": 170, "note": 620}
+        headings = {
+            "match": self._lang("命中关键词", "Keyword"),
+            "category": self._lang("归类到", "Category"),
+            "note": self._lang("备注", "Note"),
+        }
+        widths = {"match": 240, "category": 200, "note": 620}
         for col in columns:
             self.memory_tree.heading(col, text=headings[col])
             self.memory_tree.column(col, width=widths[col], anchor="w")
@@ -201,9 +209,9 @@ class MemoryPageMixin:
             self.memory_data = data
             self.memory_dirty = False
             self.refresh_memory_table()
-            self._refresh_memory_status("已从本地记忆文件加载。")
+            self._refresh_memory_status(self._lang("已从本地记忆文件加载。", "Loaded from local memory."))
         except Exception as e:
-            messagebox.showerror("加载记忆失败", str(e))
+            messagebox.showerror(self._lang("加载记忆失败", "Failed to Load Memory"), str(e))
 
     def refresh_memory_table(self):
         if not hasattr(self, "memory_tree"):
@@ -222,7 +230,7 @@ class MemoryPageMixin:
                 tags=(tag,),
                 values=(
                     rule.get("match", ""),
-                    rule.get("category", ""),
+                    self.category_to_display(rule.get("category", "")),
                     rule.get("note", ""),
                 ),
             )
@@ -230,11 +238,14 @@ class MemoryPageMixin:
         self.memory_tree.tag_configure("even", background="#ffffff")
         self.memory_tree.tag_configure("odd", background="#f8fafc")
 
-        self.memory_count_var.set(f"{len(rules)} 条规则")
-        if self.memory_dirty:
-            self._refresh_memory_status("有未保存修改。")
+        if get_language() == "en":
+            self.memory_count_var.set(f"{len(rules)} rules")
         else:
-            self._refresh_memory_status("已保存到本地记忆。")
+            self.memory_count_var.set(f"{len(rules)} 条规则")
+        if self.memory_dirty:
+            self._refresh_memory_status(self._lang("有未保存修改。", "Unsaved changes."))
+        else:
+            self._refresh_memory_status(self._lang("已保存到本地记忆。", "Saved to local memory."))
 
     def _refresh_memory_status(self, text=None):
         if not hasattr(self, "memory_status_var"):
@@ -242,9 +253,9 @@ class MemoryPageMixin:
         if text:
             self.memory_status_var.set(text)
         elif self.memory_dirty:
-            self.memory_status_var.set("有未保存修改。")
+            self.memory_status_var.set(self._lang("有未保存修改。", "Unsaved changes."))
         else:
-            self.memory_status_var.set("已保存到本地记忆。")
+            self.memory_status_var.set(self._lang("已保存到本地记忆。", "Saved to local memory."))
 
     def get_selected_memory_indices(self):
         indices = []
@@ -261,7 +272,10 @@ class MemoryPageMixin:
     def edit_selected_memory_rule(self):
         indices = self.get_selected_memory_indices()
         if not indices:
-            messagebox.showwarning("未选择", "请先选择一条规则。")
+            messagebox.showwarning(
+                self._lang("未选择", "Nothing Selected"),
+                self._lang("请先选择一条规则。", "Please select a rule first.")
+            )
             return
         self._open_memory_rule_editor(indices[0])
 
@@ -270,8 +284,8 @@ class MemoryPageMixin:
         rule = {} if is_new else self.memory_data["rules"][index]
 
         editor = ctk.CTkToplevel(self.root)
-        editor.title("添加规则" if is_new else "编辑规则")
-        editor.geometry("520x400")
+        editor.title(self._lang("添加规则" if is_new else "编辑规则", "New Rule" if is_new else "Edit Rule"))
+        editor.geometry("560x420")
         editor.configure(fg_color=COL_BG)
         editor.transient(self.root)
         editor.grab_set()
@@ -300,8 +314,8 @@ class MemoryPageMixin:
         cat_default = rule.get("category", CATEGORIES[0])
         if cat_default not in CATEGORIES:
             cat_default = CATEGORIES[0]
-        cat_var = tk.StringVar(value=cat_default)
-        ctk.CTkOptionMenu(card, variable=cat_var, values=CATEGORIES, height=36).pack(fill="x", padx=20)
+        cat_var = tk.StringVar(value=self.category_to_display(cat_default))
+        ctk.CTkOptionMenu(card, variable=cat_var, values=self.get_category_display_options(), height=36).pack(fill="x", padx=20)
 
         ctk.CTkLabel(card, text="备注（可选）", anchor="w").pack(fill="x", padx=20, pady=(14, 4))
         note_var = tk.StringVar(value=rule.get("note", ""))
@@ -314,11 +328,15 @@ class MemoryPageMixin:
         def save():
             match_text = match_var.get().strip()
             if not match_text:
-                messagebox.showwarning("缺少关键词", "请填写命中关键词。", parent=editor)
+                messagebox.showwarning(
+                    self._lang("缺少关键词", "Missing Keyword"),
+                    self._lang("请填写命中关键词。", "Please enter a keyword."),
+                    parent=editor
+                )
                 return
             new_rule = {
                 "match": match_text,
-                "category": cat_var.get(),
+                "category": self.display_to_category(cat_var.get()),
                 "note": note_var.get().strip(),
             }
             if is_new:
@@ -352,9 +370,15 @@ class MemoryPageMixin:
     def delete_selected_memory_rules(self):
         indices = self.get_selected_memory_indices()
         if not indices:
-            messagebox.showwarning("未选择", "请先选择要删除的规则。")
+            messagebox.showwarning(
+                self._lang("未选择", "Nothing Selected"),
+                self._lang("请先选择要删除的规则。", "Please select rules to delete.")
+            )
             return
-        if not messagebox.askyesno("确认删除", f"确认删除选中的 {len(indices)} 条规则吗？"):
+        if not messagebox.askyesno(
+            self._lang("确认删除", "Confirm Delete"),
+            self._lang(f"确认删除选中的 {len(indices)} 条规则吗？", f"Delete {len(indices)} selected rule(s)?")
+        ):
             return
         for i in reversed(indices):
             if 0 <= i < len(self.memory_data["rules"]):
@@ -368,10 +392,13 @@ class MemoryPageMixin:
                 json.dump(self.memory_data, f, ensure_ascii=False, indent=2)
             self.memory_dirty = False
             self.refresh_memory_table()
-            self._refresh_memory_status("已保存到本地记忆。")
+            self._refresh_memory_status(self._lang("已保存到本地记忆。", "Saved to local memory."))
             if not silent:
-                messagebox.showinfo("保存成功", "整理记忆已保存。")
+                messagebox.showinfo(
+                    self._lang("保存成功", "Saved"),
+                    self._lang("整理记忆已保存。", "Memory rules saved.")
+                )
             return True
         except Exception as e:
-            messagebox.showerror("保存记忆失败", str(e))
+            messagebox.showerror(self._lang("保存记忆失败", "Failed to Save Memory"), str(e))
             return False

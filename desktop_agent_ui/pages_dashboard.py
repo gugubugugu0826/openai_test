@@ -7,6 +7,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from desktop_agent.healthcheck import run_healthcheck
+from desktop_agent.i18n import get_language
 from desktop_agent_ui.theme import *
 from desktop_agent_ui.utils import get_effective_scan_paths, format_scan_paths
 
@@ -16,11 +17,14 @@ ACTION_LOG_FILE  = Path("desktop_action_log.json")
 
 
 class DashboardPageMixin:
+    def _lang(self, zh, en):
+        return en if get_language() == "en" else zh
+
     def build_home_page(self, parent):
         self.page_header(
             parent,
             "整理桌面",
-            "先检查准备情况，确认无误后按 1 → 3 完成整理。",
+            self._lang("先检查准备情况，确认无误后按 1 → 3 完成整理。", "Check the current status first, then follow Steps 1 → 3."),
         )
 
         body = ctk.CTkFrame(parent, fg_color="transparent")
@@ -31,7 +35,12 @@ class DashboardPageMixin:
         self.home_status_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         self.home_status_card.grid(row=0, column=0, padx=6, pady=(6, 10), sticky="ew")
         self.home_status_card.grid_columnconfigure(0, weight=1)
-        self._render_home_status_message("检查中…", "正在检查运行环境，请稍候。", COL_TEXT_MUTED, COL_CARD)
+        self._render_home_status_message(
+            self._lang("检查中…", "Checking..."),
+            self._lang("正在检查运行环境，请稍候。", "Checking the runtime environment. Please wait a moment."),
+            COL_TEXT_MUTED,
+            COL_CARD,
+        )
 
         # 当前设置摘要
         summary = ctk.CTkFrame(body, fg_color="transparent")
@@ -40,21 +49,21 @@ class DashboardPageMixin:
 
         self.home_scan_var = tk.StringVar(value="-")
         self.home_target_var = tk.StringVar(value="-")
-        self._mini_card(summary, 0, "扫描位置", self.home_scan_var)
-        self._mini_card(summary, 1, "整理到", self.home_target_var)
+        self._mini_card(summary, 0, self._lang("扫描位置", "Scan Path"), self.home_scan_var)
+        self._mini_card(summary, 1, self._lang("整理到", "Target Folder"), self.home_target_var)
 
         # 引导三步 — (序号, 标题, 描述, 按钮文字, 回调, 主色, hover色, 完成判断文件)
         self._step_badge_vars = [tk.StringVar(value=""), tk.StringVar(value=""), tk.StringVar(value="")]
         steps = [
-            ("1", "扫描并生成整理方案",
-             "让 AI 扫描桌面、自动分类，生成一份方案（此步不会移动文件）。",
-             "扫描", self.start_scan, COL_ACCENT, "#1d4ed8"),
-            ("2", "查看并调整方案",
-             "检查分类结果，可以手动改分类或跳过个别文件。",
-             "查看", self.load_review_table, COL_ACCENT, "#1d4ed8"),
-            ("3", "确认并开始整理",
-             "核对摘要后正式整理。默认复制文件，原文件保留。",
-             "整理", self.confirm_apply, COL_DANGER, "#b91c1c"),
+            ("1", self._lang("扫描并生成整理方案", "Scan and Build Review Plan"),
+             self._lang("让 AI 扫描桌面、自动分类，生成一份方案（此步不会移动文件）。", "Scan the desktop, classify items, and generate a plan. This step does not move files."),
+             self._lang("扫描", "Scan"), self.start_scan, COL_ACCENT, "#1d4ed8"),
+            ("2", self._lang("查看并调整方案", "Review and Adjust the Plan"),
+             self._lang("检查分类结果，可以手动改分类或跳过个别文件。", "Review the categories, adjust them manually, or skip individual items."),
+             self._lang("查看", "Open"), self.load_review_table, COL_ACCENT, "#1d4ed8"),
+            ("3", self._lang("确认并开始整理", "Confirm and Start Organizing"),
+             self._lang("核对摘要后正式整理。默认复制文件，原文件保留。", "Confirm the summary and start organizing. Copy mode is used by default, so originals stay in place."),
+             self._lang("整理", "Apply"), self.confirm_apply, COL_DANGER, "#b91c1c"),
         ]
         for i, (num, title, desc, btn_text, cmd, color, hover_color) in enumerate(steps, start=2):
             self._step_card(body, i, num, title, desc, btn_text, cmd, color, hover_color, self._step_badge_vars[i - 2])
@@ -63,14 +72,14 @@ class DashboardPageMixin:
         footer.grid(row=5, column=0, pady=(8, 4), sticky="w")
 
         ctk.CTkButton(
-            footer, text="重新检查", width=110, height=36, corner_radius=8,
+            footer, text=self._lang("重新检查", "Re-check"), width=110, height=36, corner_radius=8,
             fg_color="transparent", border_width=1, border_color=COL_BORDER,
             text_color=COL_TEXT_NAV, hover_color=COL_HOVER,
             command=self.refresh_home_status,
         ).pack(side="left", padx=6)
 
         ctk.CTkButton(
-            footer, text="打开整理目录", width=130, height=36, corner_radius=8,
+            footer, text=self._lang("打开整理目录", "Open Target Folder"), width=160 if get_language() == "en" else 130, height=36, corner_radius=8,
             fg_color=COL_OK, hover_color="#059669",
             command=self.open_target_folder,
         ).pack(side="left", padx=6)
@@ -132,7 +141,11 @@ class DashboardPageMixin:
 
         if hasattr(self, "_step_badge_vars"):
             step_files  = [OBSERVATION_FILE, REVIEW_FILE, ACTION_LOG_FILE]
-            step_labels = ["✓ 已扫描", "✓ 已生成方案", "✓ 已整理"]
+            step_labels = [
+                self._lang("✓ 已扫描", "✓ Scanned"),
+                self._lang("✓ 已生成方案", "✓ Plan Ready"),
+                self._lang("✓ 已整理", "✓ Applied"),
+            ]
             for var, f, label in zip(self._step_badge_vars, step_files, step_labels):
                 var.set(label if f.exists() else "")
 
@@ -140,7 +153,7 @@ class DashboardPageMixin:
         self.run_command(
             "run",
             guided=True,
-            busy_text="正在扫描桌面并生成整理方案…\n（此步只生成方案，不会移动文件）",
+            busy_text=self._lang("正在扫描桌面并生成整理方案…\n（此步只生成方案，不会移动文件）", "Scanning the desktop and building the plan...\n(This step only generates a plan and does not move files.)"),
             on_done=self._after_scan_done,
         )
 
@@ -154,7 +167,7 @@ class DashboardPageMixin:
                 count = 0
 
         if not REVIEW_FILE.exists():
-            messagebox.showwarning("没有生成方案", "扫描似乎没有生成方案，请查看「运行日志」了解原因。")
+            messagebox.showwarning("没有生成方案", self._lang("扫描似乎没有生成方案，请查看「运行日志」了解原因。", "The scan did not appear to produce a plan. Check Logs for details."))
             self.show_page("Logs")
             return
 
@@ -164,15 +177,20 @@ class DashboardPageMixin:
     def _after_apply_done(self):
         self.show_page("Home")
         self.refresh_home_status()
-        if messagebox.askyesno("整理完成", "文件已整理完成！\n\n现在打开整理目录查看结果吗？"):
+        if messagebox.askyesno("整理完成", self._lang("文件已整理完成！\n\n现在打开整理目录查看结果吗？", "Organizing is complete.\n\nOpen the target folder now?")):
             self.open_target_folder()
 
     def refresh_home_status(self):
         if not hasattr(self, "home_status_card") or self._checking:
             return
         self._checking = True
-        self.status_var.set("检查中…")
-        self._render_home_status_message("检查中…", "正在检查运行环境，请稍候。", COL_TEXT_MUTED, "#f9fafb")
+        self.status_var.set(self._lang("检查中…", "Checking..."))
+        self._render_home_status_message(
+            self._lang("检查中…", "Checking..."),
+            self._lang("正在检查运行环境，请稍候。", "Checking the runtime environment. Please wait a moment."),
+            COL_TEXT_MUTED,
+            "#f9fafb",
+        )
         self.update_home_summary()
         threading.Thread(target=self._do_home_check, daemon=True).start()
 
@@ -207,13 +225,13 @@ class DashboardPageMixin:
         self._clear(self.home_status_card)
 
         if all_ok:
-            title = "✓  一切就绪，可以开始整理"
-            subtitle = "按下方 1 → 3 的步骤即可完成整理。"
+            title = self._lang("✓  一切就绪，可以开始整理", "✓  Everything is ready")
+            subtitle = self._lang("按下方 1 → 3 的步骤即可完成整理。", "Follow Steps 1 → 3 below to finish the workflow.")
             color = COL_OK
             bg = COL_OK_SOFT
         else:
-            title = f"需要先解决 {len(fails)} 个问题"
-            subtitle = "下面标记 ✗ 的项需要处理，处理后点「重新检查」。"
+            title = self._lang(f"需要先解决 {len(fails)} 个问题", f"{len(fails)} issue(s) need attention first")
+            subtitle = self._lang("下面标记 ✗ 的项需要处理，处理后点「重新检查」。", "Please fix the ✗ items below, then run Re-check.")
             color = COL_WARN_TEXT
             bg = COL_WARN_SOFT
 
@@ -241,7 +259,7 @@ class DashboardPageMixin:
                 font=ctk.CTkFont(size=14, weight="bold"),
             ).pack(side="left")
             ctk.CTkLabel(
-                line, text=f"{name}：{r.get('message', '')}",
+                line, text=f"{name}: {r.get('message', '')}",
                 text_color="#7c2d12",
                 font=ctk.CTkFont(size=13), justify="left", wraplength=560,
             ).pack(side="left", padx=(6, 0))
@@ -250,14 +268,14 @@ class DashboardPageMixin:
         config = self.read_config_safely()
         if config.get("llm_provider") == "builtin" and not self.is_model_present():
             ctk.CTkButton(
-                self.home_status_card, text="获取 AI 模型", height=32, corner_radius=8,
+                self.home_status_card, text=self._lang("获取 AI 模型", "Get AI Model"), height=32, corner_radius=8,
                 fg_color=COL_ACCENT, hover_color=COL_ACCENT,
                 command=lambda: self.open_model_setup(on_done=self.refresh_home_status),
             ).grid(row=rrow, column=0, padx=18, pady=(6, 0), sticky="w")
             rrow += 1
 
         ctk.CTkButton(
-            self.home_status_card, text="查看完整检查日志", height=28, corner_radius=8,
+            self.home_status_card, text=self._lang("查看完整检查日志", "Open Full Check Log"), height=28, corner_radius=8,
             fg_color="transparent", border_width=1, border_color=COL_BORDER,
             text_color=COL_TEXT_NAV, hover_color=COL_HOVER,
             command=lambda: self.run_command("check"),

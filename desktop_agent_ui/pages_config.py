@@ -5,6 +5,12 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from desktop_agent.i18n import (
+    get_language,
+    get_language_label,
+    set_language,
+    t,
+)
 from desktop_agent_ui.theme import *
 
 CONFIG_FILE = Path("config.json")
@@ -131,7 +137,14 @@ class ConfigPageMixin:
             input_frame.grid(row=i, column=1, padx=8, pady=8, sticky="ew")
             input_frame.grid_columnconfigure(0, weight=1)
 
-            if key == "llm_provider":
+            if key == "ui_language":
+                widget = ctk.CTkOptionMenu(
+                    input_frame,
+                    variable=var,
+                    values=[get_language_label("zh"), get_language_label("en")],
+                )
+                widget.grid(row=0, column=0, sticky="ew")
+            elif key == "llm_provider":
                 widget = ctk.CTkOptionMenu(
                     input_frame,
                     variable=var,
@@ -245,6 +258,8 @@ class ConfigPageMixin:
         self._loading_config = True
         for key, var in self.config_vars.items():
             value = config.get(key, "")
+            if key == "ui_language":
+                value = get_language_label(value or get_language())
             if isinstance(value, bool):
                 value = "true" if value else "false"
             var.set(str(value))
@@ -258,6 +273,8 @@ class ConfigPageMixin:
     def save_config_panel(self, silent=False):
         try:
             config = {}
+
+            config["ui_language"] = get_language()
 
             first_run_text = self.config_vars["first_run_completed"].get().strip().lower()
             config["first_run_completed"] = first_run_text == "true"
@@ -324,7 +341,10 @@ class ConfigPageMixin:
             self.update_home_summary()
             self.update_dashboard()
             if not silent:
-                messagebox.showinfo("保存成功", "设置已保存。建议回到「整理桌面」点“重新检查”。")
+                messagebox.showinfo(
+                    self._lang("保存成功", "Saved"),
+                    self._lang("设置已保存。", "Settings saved.")
+                )
             return True
         except Exception as e:
             messagebox.showerror("保存设置失败", str(e))
@@ -342,9 +362,11 @@ class ConfigPageMixin:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(default_config, f, ensure_ascii=False, indent=2)
 
+        set_language(default_config.get("ui_language"))
         self.load_config_panel()
         self.update_home_summary()
         self.update_dashboard()
+        self.rebuild_window_for_language("Settings")
 
     def export_config(self):
         target_path = filedialog.asksaveasfilename(
@@ -388,10 +410,12 @@ class ConfigPageMixin:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
 
+            set_language(config.get("ui_language"))
             self.load_config_panel()
             self.update_home_summary()
             self.update_dashboard()
-            messagebox.showinfo("导入成功", "配置已导入。建议回到「整理桌面」点“重新检查”。")
+            messagebox.showinfo(self._lang("导入成功", "Imported"), self._lang("配置已导入。建议回到「整理桌面」点「重新检查」。", "Config imported. Return to Organize Desktop and click Re-check."))
+            self.rebuild_window_for_language("Settings")
         except Exception as e:
             messagebox.showerror("导入失败", str(e))
 

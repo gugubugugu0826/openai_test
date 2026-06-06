@@ -3,7 +3,7 @@
 > 一个 Windows 桌面文件整理工具：扫描桌面 → AI 自动分类 → 人工确认 → 一键整理。
 > 自带可离线运行的小模型，**无需 Ollama、无需 API Key、无需联网也能用**（规则模式）。
 
-![version](https://img.shields.io/badge/version-v2.0-blue) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![python](https://img.shields.io/badge/python-3.10%2B-green)
+![version](https://img.shields.io/badge/version-v2.1-blue) ![platform](https://img.shields.io/badge/platform-Windows-lightgrey) ![python](https://img.shields.io/badge/python-3.10%2B-green)
 
 ---
 
@@ -27,6 +27,7 @@
 - 📋 计划解释：让 AI 解释本次整理方案（分类统计、风险项、建议）
 - 🔒 安全机制：扫描不动文件、整理前摘要二次确认、复制模式、可撤销（Undo）
 - 🩺 一键诊断报告（自动隐藏 API Key）
+- 🌐 中英双语界面（GUI 右上角 中文 / ENG 一键切换）
 - 🖥️ 同时提供 GUI 和命令行（CLI）
 
 ---
@@ -48,7 +49,7 @@
 
 ### A. 普通用户（用打包好的发布版）
 
-1. 到本仓库 **[Releases](../../releases)** 下载 `QwenDesktopAgent_v2.0.zip` 并解压。
+1. 到本仓库 **[Releases](../../releases)** 下载 `QwenDesktopAgent_v2.1.zip` 并解压。
 2. 双击 `QwenDesktopAgent.exe`。
 3. 第一次打开会有引导：选整理目录 + 选分类方式；若选「智能分类」且本机没有模型，会让你**下载 / 选择本地模型 / 暂时跳过**。
 4. 进入「整理桌面」页，按 ① 扫描 → ② 查看调整 → ③ 确认整理。
@@ -233,7 +234,7 @@ pip install -r requirements.txt
 python build_release.py
 ```
 
-产物在 `QwenDesktopAgent_v2.0/`，主程序 `QwenDesktopAgent.exe`。脚本会：
+产物在 `QwenDesktopAgent_v2.1/`，主程序 `QwenDesktopAgent.exe`。脚本会：
 
 - 用 PyInstaller `--onedir --windowed` 打包；
 - 复制 `runtime/`（AI 引擎，体积小，始终打包）；
@@ -241,7 +242,7 @@ python build_release.py
 - 把 `config.release.json` 生成为发布版 `config.json`，并写入模型下载地址、开启首次引导、清空 API Key；
 - 打包前自动结束残留的 `llama-server.exe` / 旧程序进程，避免目录占用导致删除/打包失败。
 
-发布到 GitHub：源码进仓库，**把 `QwenDesktopAgent_v2.0` 压成 zip 上传到 [Releases](../../releases)**，不要把成品/模型塞进代码树。
+发布到 GitHub：源码进仓库，**把 `QwenDesktopAgent_v2.1` 压成 zip 上传到 [Releases](../../releases)**，不要把成品/模型塞进代码树。
 
 > 关键打包开关（`build_release.py` 顶部）：
 > - `BUNDLE_MODEL`：是否把大模型一起打包（默认 False）

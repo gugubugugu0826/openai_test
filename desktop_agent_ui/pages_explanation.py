@@ -2,14 +2,16 @@ import json
 import os
 import re
 import tkinter as tk
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tkinter import messagebox
 
 import customtkinter as ctk
 
+from desktop_agent.i18n import get_category_display, get_language, translate_text
 from desktop_agent.plan_explainer import explain_current_plan
 from desktop_agent_ui.theme import *
+
 
 EXPLANATION_MD_FILE = Path("desktop_agent_explanation.md")
 EXPLANATION_JSON_FILE = Path("desktop_agent_explanation.json")
@@ -43,21 +45,11 @@ class ExplanationPageMixin:
         toolbar = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         toolbar.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
 
-        ctk.CTkButton(
-            toolbar,
-            text="生成 / 刷新解释",
-            corner_radius=8,
-            command=self.generate_plan_explanation_gui,
-        ).pack(side="left", padx=(12, 8), pady=12)
-        ctk.CTkButton(
-            toolbar,
-            text="打开解释文件",
-            corner_radius=8,
-            command=self.open_plan_explanation_file,
-        ).pack(side="left", padx=8, pady=12)
+        ctk.CTkButton(toolbar, text="生成 / 刷新解释", corner_radius=8, command=self.generate_plan_explanation_gui).pack(side="left", padx=(12, 8), pady=12)
+        ctk.CTkButton(toolbar, text="打开解释文件", corner_radius=8, command=self.open_plan_explanation_file).pack(side="left", padx=8, pady=12)
 
-        self.explanation_status_var = tk.StringVar(value="还没有生成计划解释")
-        self.explanation_meta_var = tk.StringVar(value="生成后会在这里显示来源、模型模式和目标目录。")
+        self.explanation_status_var = tk.StringVar(value=self._section_copy("还没有生成计划解释。", "No plan explanation yet."))
+        self.explanation_meta_var = tk.StringVar(value=self._section_copy("生成后，这里会显示来源、模型模式和目标目录。", "After generation, the source, model mode, and target folder will appear here."))
 
         overview = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         overview.grid(row=1, column=0, padx=6, pady=(8, 6), sticky="ew")
@@ -65,7 +57,7 @@ class ExplanationPageMixin:
 
         ctk.CTkLabel(
             overview,
-            text="本次计划概览",
+            text=self._section_copy("本次计划概览", "Plan Overview"),
             font=("Microsoft YaHei UI", 15, "bold"),
             text_color=COL_TEXT,
         ).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
@@ -86,11 +78,7 @@ class ExplanationPageMixin:
             justify="left",
         ).grid(row=2, column=0, padx=18, pady=(0, 14), sticky="w")
 
-        self.explanation_content = ctk.CTkScrollableFrame(
-            body,
-            corner_radius=14,
-            fg_color=COL_CARD,
-        )
+        self.explanation_content = ctk.CTkScrollableFrame(body, corner_radius=14, fg_color=COL_CARD)
         self.explanation_content.grid(row=2, column=0, padx=6, pady=8, sticky="nsew")
         self.explanation_content.grid_columnconfigure(0, weight=1)
 
@@ -107,22 +95,22 @@ class ExplanationPageMixin:
                 self._render_explanation_data(explanation)
                 return
             except Exception as e:
-                self.explanation_status_var.set("读取计划解释失败")
+                self.explanation_status_var.set(self._section_copy("读取计划解释失败", "Failed to load explanation"))
                 self.explanation_meta_var.set(str(e))
 
         if EXPLANATION_MD_FILE.exists():
             try:
                 content = EXPLANATION_MD_FILE.read_text(encoding="utf-8")
-                self.explanation_status_var.set("已加载解释文件")
-                self.explanation_meta_var.set("当前显示的是解释文件内容的简化视图。")
+                self.explanation_status_var.set(self._section_copy("已加载解释文件", "Explanation Loaded"))
+                self.explanation_meta_var.set(self._section_copy("当前显示的是解释文件内容的简化视图。", "This is a simplified view of the explanation file."))
                 self._render_markdown_fallback(self._cleanup_markdown_for_display(content))
             except Exception as e:
-                self.explanation_status_var.set("读取计划解释失败")
+                self.explanation_status_var.set(self._section_copy("读取计划解释失败", "Failed to load explanation"))
                 self.explanation_meta_var.set(str(e))
-                self._render_markdown_fallback(f"读取解释文件失败：\n{e}")
+                self._render_markdown_fallback(self._section_copy(f"读取解释文件失败：\n{e}", f"Failed to read explanation file:\n{e}"))
         else:
-            self.explanation_status_var.set("还没有生成计划解释")
-            self.explanation_meta_var.set("请先在“整理桌面”生成方案，或点击“生成 / 刷新解释”。")
+            self.explanation_status_var.set(self._section_copy("还没有生成计划解释。", "No plan explanation yet."))
+            self.explanation_meta_var.set(self._section_copy("请先在「整理桌面」生成方案，或点击上方按钮生成解释。", "Generate a plan on the Organize Desktop page, or click the button above."))
             self._render_empty_state()
 
     def _render_explanation_data(self, explanation):
@@ -136,7 +124,7 @@ class ExplanationPageMixin:
             f"目标目录：{explanation.get('target_root', '未设置')}",
             f"文件夹处理：{explanation.get('folder_mode', '未知')}",
         ]
-        self.explanation_meta_var.set(" | ".join(meta_parts))
+        self.explanation_meta_var.set(translate_text(" | ".join(meta_parts)))
 
         warning_items = explanation.get("warning_items", []) or []
         recommendations = explanation.get("recommendations", []) or []
@@ -188,17 +176,15 @@ class ExplanationPageMixin:
         for child in self.explanation_content.winfo_children():
             child.destroy()
 
+    def _section_copy(self, zh, en):
+        return en if get_language() == "en" else zh
+
     def _make_section_card(self, row, title, subtitle=None):
         card = ctk.CTkFrame(self.explanation_content, fg_color=COL_CARD, corner_radius=12)
         card.grid(row=row, column=0, padx=12, pady=(0, 12), sticky="ew")
         card.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            card,
-            text=title,
-            font=("Microsoft YaHei UI", 15, "bold"),
-            text_color=COL_TEXT,
-        ).grid(row=0, column=0, padx=18, pady=(16, 4), sticky="w")
+        ctk.CTkLabel(card, text=title, font=("Microsoft YaHei UI", 15, "bold"), text_color=COL_TEXT).grid(row=0, column=0, padx=18, pady=(16, 4), sticky="w")
 
         start_row = 1
         if subtitle:
@@ -214,7 +200,11 @@ class ExplanationPageMixin:
         return card, start_row
 
     def _build_metric_strip(self, row, metrics):
-        card, start_row = self._make_section_card(row, "项目概览", "先看这里，能快速判断这次方案是否需要重点人工处理。")
+        card, start_row = self._make_section_card(
+            row,
+            self._section_copy("项目概览", "Overview"),
+            self._section_copy("先看这里，能快速判断这次方案是否需要重点人工处理。", "Start here for a quick sense of whether this plan needs manual attention."),
+        )
         grid = ctk.CTkFrame(card, fg_color="transparent")
         grid.grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="ew")
         for idx in range(len(metrics)):
@@ -228,14 +218,7 @@ class ExplanationPageMixin:
 
     def _build_text_card(self, title, text, row):
         card, start_row = self._make_section_card(row, title)
-        ctk.CTkLabel(
-            card,
-            text=text,
-            font=("Microsoft YaHei UI", 12),
-            text_color=COL_TEXT,
-            wraplength=980,
-            justify="left",
-        ).grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
+        ctk.CTkLabel(card, text=text, font=("Microsoft YaHei UI", 12), text_color=COL_TEXT, wraplength=980, justify="left").grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
 
     def _build_kv_grid_card(self, title, pairs, row):
         card, start_row = self._make_section_card(row, title)
@@ -251,7 +234,11 @@ class ExplanationPageMixin:
             ctk.CTkLabel(item, text=str(value), font=("Microsoft YaHei UI", 12, "bold"), text_color=COL_TEXT, wraplength=430, justify="left").pack(anchor="w", pady=(2, 0))
 
     def _build_two_column_stats(self, row, left_spec, right_spec):
-        card, start_row = self._make_section_card(row, "统计总览", "把类型和分类来源拆开看，会更容易判断这次结果靠的是什么。")
+        card, start_row = self._make_section_card(
+            row,
+            self._section_copy("统计总览", "Statistics"),
+            self._section_copy("把类型和分类来源拆开看，会更容易判断这次结果主要依赖什么。", "Splitting item types and classification sources makes the plan easier to read."),
+        )
         grid = ctk.CTkFrame(card, fg_color="transparent")
         grid.grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="ew")
         grid.grid_columnconfigure((0, 1), weight=1)
@@ -269,14 +256,15 @@ class ExplanationPageMixin:
             items.sort(key=lambda item: item[1], reverse=True)
 
         if not items:
-            ctk.CTkLabel(panel, text="暂无数据", font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=1, column=0, padx=14, pady=(0, 14), sticky="w")
+            ctk.CTkLabel(panel, text=self._section_copy("暂无数据", "No data"), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=1, column=0, padx=14, pady=(0, 14), sticky="w")
             return
 
         for idx, (key, value) in enumerate(items, start=1):
             line = ctk.CTkFrame(panel, fg_color="transparent")
             line.grid(row=idx, column=0, padx=14, pady=4, sticky="ew")
             line.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(line, text=str(key), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+            display_key = get_category_display(str(key))
+            ctk.CTkLabel(line, text=display_key, font=("Microsoft YaHei UI", 11), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
             ctk.CTkLabel(line, text=str(value), font=("Microsoft YaHei UI", 11, "bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="e")
 
     def _build_ranked_list_card(self, title, stats, row, sort_desc=False):
@@ -286,7 +274,7 @@ class ExplanationPageMixin:
             items.sort(key=lambda item: item[1], reverse=True)
 
         if not items:
-            ctk.CTkLabel(card, text="暂无数据", font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
+            ctk.CTkLabel(card, text=self._section_copy("暂无数据", "No data"), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
             return
 
         body = ctk.CTkFrame(card, fg_color=COL_BG, corner_radius=12)
@@ -299,20 +287,23 @@ class ExplanationPageMixin:
             row_frame = ctk.CTkFrame(body, fg_color="transparent")
             row_frame.grid(row=idx, column=1, padx=(0, 14), pady=8, sticky="ew")
             row_frame.grid_columnconfigure(1, weight=1)
-            ctk.CTkLabel(row_frame, text=str(key), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+            display_key = get_category_display(str(key))
+            ctk.CTkLabel(row_frame, text=display_key, font=("Microsoft YaHei UI", 11), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
             bar_bg = ctk.CTkFrame(row_frame, fg_color="#e5eefc", corner_radius=6, height=12)
             bar_bg.grid(row=1, column=0, columnspan=2, pady=(6, 0), sticky="ew")
             bar_bg.grid_columnconfigure(0, weight=max(int(value), 1))
             bar_bg.grid_columnconfigure(1, weight=max(int(top_value - value), 0))
-            bar_fill = ctk.CTkFrame(bar_bg, fg_color=COL_ACCENT, corner_radius=6, height=12)
-            bar_fill.grid(row=0, column=0, sticky="ew")
+            ctk.CTkFrame(bar_bg, fg_color=COL_ACCENT, corner_radius=6, height=12).grid(row=0, column=0, sticky="ew")
             ctk.CTkLabel(row_frame, text=str(value), font=("Microsoft YaHei UI", 11, "bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="e", padx=(10, 0))
 
     def _build_warning_card(self, title, items, row):
-        subtitle = "这些项目更值得你优先人工检查，通常是无法判断、快捷方式或分类失败项。"
+        subtitle = self._section_copy(
+            "这些项目更值得你优先人工检查，通常是无法判断、快捷方式或分类失败项。",
+            "These items are worth checking first, especially unclear items, shortcuts, or failed classifications.",
+        )
         card, start_row = self._make_section_card(row, title, subtitle)
         if not items:
-            ctk.CTkLabel(card, text="本次没有明显异常项。", font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
+            ctk.CTkLabel(card, text=self._section_copy("本次没有明显异常项。", "No obvious risky items in this plan."), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED).grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="w")
             return
 
         list_box = ctk.CTkFrame(card, fg_color=COL_BG, corner_radius=12)
@@ -323,16 +314,16 @@ class ExplanationPageMixin:
             entry = ctk.CTkFrame(list_box, fg_color="#ffffff" if idx % 2 == 0 else "#f8fafc", corner_radius=10)
             entry.grid(row=idx, column=0, padx=10, pady=6, sticky="ew")
             entry.grid_columnconfigure(0, weight=1)
-            item_name = item.get("name") or item.get("path") or "未命名项目"
-            category = item.get("category") or "未分类"
-            reason = item.get("reason") or "建议人工检查"
+            item_name = item.get("name") or item.get("path") or self._section_copy("未命名项目", "Unnamed item")
+            category = get_category_display(item.get("category") or "无法判断")
+            reason = item.get("reason") or self._section_copy("建议人工检查", "Manual review recommended")
             ctk.CTkLabel(entry, text=item_name, font=("Microsoft YaHei UI", 11, "bold"), text_color=COL_TEXT, anchor="w").grid(row=0, column=0, padx=12, pady=(10, 2), sticky="w")
-            ctk.CTkLabel(entry, text=f"当前分类：{category}", font=("Microsoft YaHei UI", 10), text_color=COL_TEXT_MUTED, anchor="w").grid(row=1, column=0, padx=12, sticky="w")
-            ctk.CTkLabel(entry, text=f"原因：{reason}", font=("Microsoft YaHei UI", 10), text_color="#b45309", anchor="w", wraplength=920, justify="left").grid(row=2, column=0, padx=12, pady=(2, 10), sticky="w")
+            ctk.CTkLabel(entry, text=f"{self._section_copy('当前分类：', 'Current category: ')}{category}", font=("Microsoft YaHei UI", 10), text_color=COL_TEXT_MUTED, anchor="w").grid(row=1, column=0, padx=12, sticky="w")
+            ctk.CTkLabel(entry, text=f"{self._section_copy('原因：', 'Reason: ')}{reason}", font=("Microsoft YaHei UI", 10), text_color="#b45309", anchor="w", wraplength=920, justify="left").grid(row=2, column=0, padx=12, pady=(2, 10), sticky="w")
 
     def _build_recommendation_card(self, title, recommendations, row):
         card, start_row = self._make_section_card(row, title)
-        items = recommendations or ["暂无额外建议。"]
+        items = recommendations or [self._section_copy("暂无额外建议。", "No extra recommendations.")]
         box = ctk.CTkFrame(card, fg_color=COL_OK_SOFT, corner_radius=12)
         box.grid(row=start_row, column=0, padx=18, pady=(0, 16), sticky="ew")
         for idx, rec in enumerate(items):
@@ -346,12 +337,15 @@ class ExplanationPageMixin:
             ).grid(row=idx, column=0, padx=14, pady=(12 if idx == 0 else 4, 12 if idx == len(items) - 1 else 0), sticky="w")
 
     def _render_markdown_fallback(self, content):
-        self._build_text_card("解释内容", content, 0)
+        self._build_text_card(self._section_copy("解释内容", "Explanation"), content, 0)
 
     def _render_empty_state(self):
         self._build_text_card(
-            "还没有生成解释",
-            "这里会显示本次整理计划的摘要、分类统计、需要人工复核的项目，以及下一步建议。",
+            self._section_copy("还没有生成解释", "No explanation yet"),
+            self._section_copy(
+                "这里会显示本次整理计划的摘要、分类统计、需要人工复核的项目，以及下一步建议。",
+                "This page will show the plan summary, category statistics, items that need manual review, and suggested next steps.",
+            ),
             0,
         )
 
@@ -372,14 +366,17 @@ class ExplanationPageMixin:
             self.load_plan_explanation_panel()
             self.show_page("Explanation")
         except Exception as e:
-            messagebox.showerror("生成计划解释失败", str(e))
+            messagebox.showerror(self._section_copy("生成计划解释失败", "Failed to Generate Explanation"), str(e))
 
     def open_plan_explanation_file(self):
         if not EXPLANATION_MD_FILE.exists():
-            messagebox.showwarning("没有解释文件", "请先生成计划解释。")
+            messagebox.showwarning(
+                self._section_copy("没有解释文件", "No Explanation File"),
+                self._section_copy("请先生成计划解释。", "Please generate a plan explanation first.")
+            )
             return
 
         try:
             os.startfile(str(EXPLANATION_MD_FILE))
         except Exception as e:
-            messagebox.showerror("打开解释文件失败", str(e))
+            messagebox.showerror(self._section_copy("打开解释文件失败", "Failed to Open Explanation File"), str(e))
