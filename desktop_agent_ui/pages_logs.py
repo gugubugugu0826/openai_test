@@ -20,7 +20,7 @@ try:
     from desktop_agent.version import APP_NAME, APP_VERSION
 except Exception:
     APP_NAME = "Qwen Desktop Organizer Agent"
-    APP_VERSION = "v2.2"
+    APP_VERSION = "v3.0"
 
 
 class LogsPageMixin:
