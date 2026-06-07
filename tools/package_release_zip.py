@@ -1,10 +1,14 @@
+import sys
 import zipfile
 from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
 
 from desktop_agent.version import APP_EXE_NAME, APP_VERSION
 
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
 RELEASE_DIR = PROJECT_DIR / f"{APP_EXE_NAME}_{APP_VERSION}"
 ZIP_PATH = PROJECT_DIR / f"{APP_EXE_NAME}_{APP_VERSION}.zip"
 
