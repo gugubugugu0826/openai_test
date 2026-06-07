@@ -38,6 +38,23 @@ def load_plan_items():
     return [], "none"
 
 
+def _load_suggestion_summary() -> dict:
+    """Return suggestion queue stats if queue file exists."""
+    queue_path = Path("suggestion_queue.json")
+    if not queue_path.exists():
+        return {}
+    try:
+        data = load_json(queue_path)
+        items = data.get("items", [])
+        pending = sum(1 for i in items if i.get("enabled", True))
+        return {
+            "pending_count": pending,
+            "accumulated_since": data.get("accumulated_since", ""),
+        }
+    except Exception:
+        return {}
+
+
 def build_plan_explanation():
     config = load_config()
     provider = config.get("llm_provider", "none")
@@ -52,16 +69,19 @@ def build_plan_explanation():
     type_counts = {}
     category_counts = {}
     classified_by_counts = {}
+    source_counts = {}
     warning_items = []
 
     for item in enabled_items:
         item_type = item.get("type", "unknown")
         category = get_item_category(item)
         classified_by = item.get("classified_by", "unknown")
+        source_id = item.get("source_id", "desktop")
 
         type_counts[item_type] = type_counts.get(item_type, 0) + 1
         category_counts[category] = category_counts.get(category, 0) + 1
         classified_by_counts[classified_by] = classified_by_counts.get(classified_by, 0) + 1
+        source_counts[source_id] = source_counts.get(source_id, 0) + 1
 
         reason = item.get("reason", "")
         if category in ["无法判断", "其他快捷方式"] or "failed" in reason.lower() or "无法" in reason:
@@ -71,10 +91,22 @@ def build_plan_explanation():
                     "type": item_type,
                     "category": category,
                     "reason": reason,
+                    "source_id": source_id,
                 }
             )
 
     top_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
+
+    suggestion_summary = _load_suggestion_summary()
+
+    # Try to read strategy_summary from plan if available
+    strategy_summary = ""
+    if Path(PLAN_FILE).exists():
+        try:
+            plan_data = load_json(PLAN_FILE)
+            strategy_summary = plan_data.get("strategy_summary", "")
+        except Exception:
+            pass
 
     explanation = {
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -88,8 +120,11 @@ def build_plan_explanation():
         "type_counts": type_counts,
         "category_counts": category_counts,
         "classified_by_counts": classified_by_counts,
+        "source_counts": source_counts,
         "top_categories": top_categories[:10],
         "warning_items": warning_items[:30],
+        "strategy_summary": strategy_summary,
+        "suggestion_mode_summary": suggestion_summary,
         "summary": "",
         "recommendations": [],
     }
@@ -97,6 +132,10 @@ def build_plan_explanation():
     summary_lines = [
         t("explainer.summary_counts", total=total, enabled=len(enabled_items), disabled=len(disabled_items))
     ]
+
+    if len(source_counts) > 1:
+        source_text = "、".join(f"{sid}({cnt})" for sid, cnt in source_counts.items())
+        summary_lines.append(t("explainer.summary_sources", sources=source_text, default=f"涵盖来源：{source_text}"))
 
     if provider == "none":
         summary_lines.append(t("explainer.summary_provider_none"))
@@ -115,6 +154,12 @@ def build_plan_explanation():
         summary_lines.append(t("explainer.summary_warning_items", count=len(warning_items)))
     else:
         summary_lines.append(t("explainer.summary_no_warnings"))
+
+    if suggestion_summary.get("pending_count", 0) > 0:
+        summary_lines.append(
+            t("explainer.summary_pending_suggestions", count=suggestion_summary["pending_count"],
+              default=f"建议队列还有 {suggestion_summary['pending_count']} 条待确认")
+        )
 
     explanation["summary"] = "\n".join(summary_lines)
 
@@ -147,6 +192,17 @@ def render_markdown(explanation):
         "",
         explanation["summary"],
         "",
+    ]
+
+    if explanation.get("strategy_summary"):
+        lines += [
+            f"## AI策略摘要",
+            "",
+            explanation["strategy_summary"],
+            "",
+        ]
+
+    lines += [
         f"## {t('explainer.md_counts_title')}",
         "",
         f"- {t('explainer.md_total')}: {explanation['total_items']}",
@@ -159,15 +215,21 @@ def render_markdown(explanation):
 
     for key, value in explanation["type_counts"].items():
         lines.append(f"- {key}: {value}")
-    lines.extend(["", f"## {t('explainer.md_category_stats_title')}", ""])
+
+    if explanation.get("source_counts") and len(explanation["source_counts"]) > 1:
+        lines += ["", "## 来源统计", ""]
+        for sid, cnt in explanation["source_counts"].items():
+            lines.append(f"- {sid}: {cnt}")
+
+    lines += ["", f"## {t('explainer.md_category_stats_title')}", ""]
 
     for key, value in sorted(explanation["category_counts"].items(), key=lambda x: x[1], reverse=True):
         lines.append(f"- {get_category_display(key)}: {value}")
-    lines.extend(["", f"## {t('explainer.md_source_stats_title')}", ""])
+    lines += ["", f"## {t('explainer.md_source_stats_title')}", ""]
 
     for key, value in explanation["classified_by_counts"].items():
         lines.append(f"- {key}: {value}")
-    lines.extend(["", f"## {t('explainer.md_warning_title')}", ""])
+    lines += ["", f"## {t('explainer.md_warning_title')}", ""]
 
     if explanation["warning_items"]:
         for item in explanation["warning_items"]:
@@ -177,7 +239,7 @@ def render_markdown(explanation):
     else:
         lines.append(f"- {t('explainer.md_none')}")
 
-    lines.extend(["", f"## {t('explainer.md_recommendations_title')}", ""])
+    lines += ["", f"## {t('explainer.md_recommendations_title')}", ""]
     for rec in explanation["recommendations"]:
         lines.append(f"- {rec}")
     lines.append("")

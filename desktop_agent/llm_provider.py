@@ -25,9 +25,10 @@ def clean_json_output(content: str):
     return content
 
 
-def build_classification_prompt(batch, batch_index, total_batches):
+def build_classification_prompt(batch, batch_index, total_batches, user_intent: str = ""):
     memory = load_memory()
-    prompt = f"""You are a desktop file-organizing assistant.
+    intent_block = f"\nUser's current intent: {user_intent}" if user_intent else ""
+    prompt = f"""You are a desktop file-organizing assistant.{intent_block}
 Classify each top-level desktop item into exactly ONE category.
 
 Item types:
@@ -114,16 +115,16 @@ def normalize_model_results(raw_results, batch, classified_by):
     return final_results
 
 
-def classify_none(batch, batch_index, total_batches):
+def classify_none(batch, batch_index, total_batches, user_intent: str = ""):
     return [
         fallback_without_llm(item, t("llm_provider.none_mode_reason"))
         for item in batch
     ]
 
 
-def classify_ollama(batch, batch_index, total_batches):
+def classify_ollama(batch, batch_index, total_batches, user_intent: str = ""):
     config = load_config()
-    prompt = "/no_think\n" + build_classification_prompt(batch, batch_index, total_batches)
+    prompt = "/no_think\n" + build_classification_prompt(batch, batch_index, total_batches, user_intent=user_intent)
     payload = {
         "model": config.get("model", "qwen2.5-coder:14b"),
         "prompt": prompt,
@@ -168,8 +169,8 @@ def _post_with_retry(url, headers, payload, timeout, retries=4, backoff=3):
     raise RuntimeError(t("llm_provider.request_failed"))
 
 
-def call_openai_compatible_api(api_base_url, api_model, api_key, batch, batch_index, total_batches, classified_by):
-    prompt = build_classification_prompt(batch, batch_index, total_batches)
+def call_openai_compatible_api(api_base_url, api_model, api_key, batch, batch_index, total_batches, classified_by, user_intent: str = ""):
+    prompt = build_classification_prompt(batch, batch_index, total_batches, user_intent=user_intent)
 
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -199,7 +200,7 @@ def call_openai_compatible_api(api_base_url, api_model, api_key, batch, batch_in
     return normalize_model_results(raw_results, batch, classified_by)
 
 
-def classify_openai_compatible(batch, batch_index, total_batches):
+def classify_openai_compatible(batch, batch_index, total_batches, user_intent: str = ""):
     config = load_config()
     api_base_url = config.get("api_base_url", "").strip()
     api_model = config.get("api_model", "").strip()
@@ -220,10 +221,11 @@ def classify_openai_compatible(batch, batch_index, total_batches):
         batch_index=batch_index,
         total_batches=total_batches,
         classified_by="llm_openai_compatible",
+        user_intent=user_intent,
     )
 
 
-def classify_builtin(batch, batch_index, total_batches):
+def classify_builtin(batch, batch_index, total_batches, user_intent: str = ""):
     chat_url = ensure_builtin_server_running()
     config = load_config()
     api_model = config.get("builtin_api_model", "builtin-model")
@@ -236,21 +238,22 @@ def classify_builtin(batch, batch_index, total_batches):
         batch_index=batch_index,
         total_batches=total_batches,
         classified_by="llm_builtin",
+        user_intent=user_intent,
     )
 
 
-def classify_with_llm_provider(batch, batch_index, total_batches):
+def classify_with_llm_provider(batch, batch_index, total_batches, user_intent: str = ""):
     config = load_config()
     provider = config.get("llm_provider", "none").lower().strip()
 
     if provider == "none":
-        return classify_none(batch, batch_index, total_batches)
+        return classify_none(batch, batch_index, total_batches, user_intent=user_intent)
     if provider == "ollama":
-        return classify_ollama(batch, batch_index, total_batches)
+        return classify_ollama(batch, batch_index, total_batches, user_intent=user_intent)
     if provider == "openai_compatible":
-        return classify_openai_compatible(batch, batch_index, total_batches)
+        return classify_openai_compatible(batch, batch_index, total_batches, user_intent=user_intent)
     if provider == "builtin":
-        return classify_builtin(batch, batch_index, total_batches)
+        return classify_builtin(batch, batch_index, total_batches, user_intent=user_intent)
 
     return [
         fallback_without_llm(item, t("llm_provider.unknown_provider_fallback", provider=provider))

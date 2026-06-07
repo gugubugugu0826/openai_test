@@ -97,6 +97,10 @@ class ConfigPageMixin:
             ],
         )
 
+        # ── 3.0: Sources & Schedule section ──────────────────────────────
+        self._build_sources_section(body, row=5)
+        self._build_schedule_section(body, row=6)
+
         self.load_config_panel()
 
     def build_config_section(self, parent, row, title, fields):
@@ -249,6 +253,7 @@ class ConfigPageMixin:
             if config["builtin_threads"] <= 0:
                 raise ValueError(t("config.err_threads"))
 
+            old_lang = get_language()
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
 
@@ -256,9 +261,12 @@ class ConfigPageMixin:
             self.config_dirty = False
             self.update_home_summary()
             self.update_dashboard()
-            if not silent:
-                messagebox.showinfo(t("config.saved_title"), t("config.saved_message"))
-            self.rebuild_window_for_language("Settings")
+            if get_language() != old_lang:
+                # Language changed — must rebuild all widgets for translation to take effect
+                self.rebuild_window_for_language("Settings")
+            else:
+                if not silent:
+                    messagebox.showinfo(t("config.saved_title"), t("config.saved_message"))
             return True
         except Exception as exc:
             messagebox.showerror(t("config.save_failed_title"), str(exc))
@@ -317,3 +325,274 @@ class ConfigPageMixin:
             self.rebuild_window_for_language("Settings")
         except Exception as exc:
             messagebox.showerror(t("config.import_failed_title"), str(exc))
+
+    # ── 3.0 Sources section ───────────────────────────────────────────────
+
+    def _build_sources_section(self, parent, row: int):
+        from desktop_agent.source_manager import find_wechat_path
+        card = ctk.CTkFrame(parent, fg_color=COL_CARD, corner_radius=14)
+        card.grid(row=row, column=0, padx=6, pady=10, sticky="ew")
+        card.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            card,
+            text=t("config.sources_title", default="整理来源管理"),
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=COL_TEXT,
+        ).grid(row=0, column=0, padx=18, pady=(16, 4), sticky="w")
+
+        ctk.CTkLabel(
+            card,
+            text=t("config.sources_hint", default="启用多个来源后，多来源扫描会同时整理它们"),
+            font=ctk.CTkFont(size=12),
+            text_color=COL_TEXT_MUTED,
+        ).grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
+
+        self._source_widgets: list[dict] = []
+        self._sources_inner = ctk.CTkFrame(card, fg_color="transparent")
+        self._sources_inner.grid(row=2, column=0, padx=12, pady=(0, 4), sticky="ew")
+        self._sources_inner.grid_columnconfigure(2, weight=1)
+
+        self._reload_source_widgets()
+
+        # Suggestion mode toggle
+        sugg_frame = ctk.CTkFrame(card, fg_color="transparent")
+        sugg_frame.grid(row=3, column=0, padx=18, pady=(8, 6), sticky="w")
+        ctk.CTkLabel(sugg_frame, text=t("config.suggestion_mode", default="建议模式（扫描后不直接执行，累积到队列）："), text_color=COL_TEXT_NAV).pack(side="left")
+        self.suggestion_mode_var = tk.StringVar(value="false")
+        ctk.CTkOptionMenu(sugg_frame, variable=self.suggestion_mode_var, values=["true", "false"], width=100).pack(side="left", padx=8)
+
+        # Save sources button
+        ctk.CTkButton(
+            card,
+            text=t("config.save_sources", default="保存来源设置"),
+            height=34,
+            corner_radius=8,
+            fg_color=COL_OK,
+            hover_color="#059669",
+            command=self._save_sources,
+        ).grid(row=4, column=0, padx=18, pady=(4, 14), sticky="w")
+
+        # Load current suggestion_mode
+        try:
+            cfg = self.read_config_safely()
+            self.suggestion_mode_var.set("true" if cfg.get("suggestion_mode", False) else "false")
+        except Exception:
+            pass
+
+    def _reload_source_widgets(self):
+        for w in self._sources_inner.winfo_children():
+            w.destroy()
+        self._source_widgets.clear()
+
+        try:
+            from desktop_agent.source_manager import load_sources
+            sources = load_sources()
+        except Exception:
+            sources = []
+
+        headers = [
+            t("config.source_enabled", default="启用"),
+            t("config.source_label", default="名称"),
+            t("config.source_path", default="路径"),
+            t("config.source_mode", default="模式"),
+        ]
+        for col, h in enumerate(headers):
+            ctk.CTkLabel(self._sources_inner, text=h, font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT_MUTED).grid(row=0, column=col, padx=8, pady=(4, 2), sticky="w")
+
+        for r, source in enumerate(sources, start=1):
+            enabled_var = tk.BooleanVar(value=source.enabled)
+            path_var = tk.StringVar(value=source.path or str(source.resolved_path))
+
+            _mode_display = {
+                "full": t("config.mode_full", default="完整"),
+                "incremental": t("config.mode_incremental", default="增量"),
+            }
+            _mode_display_to_internal = {v: k for k, v in _mode_display.items()}
+            mode_display_var = tk.StringVar(value=_mode_display.get(source.scan_mode, source.scan_mode))
+
+            ctk.CTkCheckBox(self._sources_inner, text="", variable=enabled_var, width=24).grid(row=r, column=0, padx=8, pady=4)
+            ctk.CTkLabel(self._sources_inner, text=source.label, width=90, text_color=COL_TEXT).grid(row=r, column=1, padx=8, pady=4, sticky="w")
+
+            path_frame = ctk.CTkFrame(self._sources_inner, fg_color="transparent")
+            path_frame.grid(row=r, column=2, padx=4, pady=4, sticky="ew")
+            path_frame.grid_columnconfigure(0, weight=1)
+            ctk.CTkEntry(path_frame, textvariable=path_var, height=30).grid(row=0, column=0, sticky="ew")
+
+            def _browse(pv=path_var, src=source):
+                import tkinter.filedialog as fd
+                selected = fd.askdirectory(title=t("config.select_scan_folder"), initialdir=pv.get() or str(Path.home()))
+                if selected:
+                    pv.set(selected)
+
+            ctk.CTkButton(path_frame, text=t("config.browse"), width=60, height=30, command=_browse).grid(row=0, column=1, padx=(4, 0))
+
+            if source.id == "wechat":
+                def _detect(pv=path_var):
+                    from desktop_agent.source_manager import find_wechat_path
+                    found = find_wechat_path()
+                    if found:
+                        pv.set(found)
+                    else:
+                        messagebox.showinfo(t("config.wechat_not_found_title", default="未检测到"), t("config.wechat_not_found_msg", default="未找到微信文件目录，请手动填写"))
+                ctk.CTkButton(path_frame, text=t("config.detect", default="检测"), width=50, height=30, command=_detect).grid(row=0, column=2, padx=(4, 0))
+
+            ctk.CTkOptionMenu(self._sources_inner, variable=mode_display_var, values=list(_mode_display.values()), width=110).grid(row=r, column=3, padx=8, pady=4)
+
+            self._source_widgets.append({
+                "id": source.id,
+                "label": source.label,
+                "enabled_var": enabled_var,
+                "path_var": path_var,
+                "mode_var": mode_display_var,
+                "mode_display_to_internal": _mode_display_to_internal,
+            })
+
+    def _save_sources(self):
+        try:
+            cfg = self.read_config_safely()
+            sources_list = []
+            for w in self._source_widgets:
+                display_val = w["mode_var"].get()
+                internal_val = w.get("mode_display_to_internal", {}).get(display_val, display_val)
+                sources_list.append({
+                    "id": w["id"],
+                    "label": w["label"],
+                    "path": w["path_var"].get().strip(),
+                    "enabled": w["enabled_var"].get(),
+                    "scan_mode": internal_val,
+                })
+            cfg["sources"] = sources_list
+            cfg["suggestion_mode"] = (self.suggestion_mode_var.get() == "true")
+
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+            self.update_home_summary()
+            messagebox.showinfo(t("config.saved_title"), t("config.sources_saved", default="来源设置已保存"))
+        except Exception as exc:
+            messagebox.showerror(t("config.save_failed_title"), str(exc))
+
+    # ── 3.0 Schedule section ──────────────────────────────────────────────
+
+    def _build_schedule_section(self, parent, row: int):
+        from desktop_agent.scheduler import apply_schedule_from_config, get_task_status
+
+        card = ctk.CTkFrame(parent, fg_color=COL_CARD, corner_radius=14)
+        card.grid(row=row, column=0, padx=6, pady=10, sticky="ew")
+        card.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            card,
+            text=t("config.schedule_title", default="定时整理"),
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=COL_TEXT,
+        ).grid(row=0, column=0, padx=18, pady=(16, 4), sticky="w")
+
+        fields_frame = ctk.CTkFrame(card, fg_color="transparent")
+        fields_frame.grid(row=1, column=0, padx=12, pady=(0, 8), sticky="ew")
+
+        self.schedule_enabled_var = tk.StringVar(value="false")
+        self.schedule_freq_var = tk.StringVar(value="weekly")
+        self.schedule_day_var = tk.StringVar(value="sunday")
+        self.schedule_hour_var = tk.StringVar(value="9")
+
+        def _lbl(text): return ctk.CTkLabel(fields_frame, text=text, text_color=COL_TEXT_NAV, width=80, anchor="w")
+
+        _lbl(t("config.schedule_enabled", default="启用：")).grid(row=0, column=0, padx=(8, 4), pady=6, sticky="w")
+        ctk.CTkOptionMenu(fields_frame, variable=self.schedule_enabled_var, values=["true", "false"], width=90).grid(row=0, column=1, padx=4, pady=6)
+
+        _lbl(t("config.schedule_frequency", default="频率：")).grid(row=0, column=2, padx=(16, 4), pady=6, sticky="w")
+        ctk.CTkOptionMenu(fields_frame, variable=self.schedule_freq_var, values=["daily", "weekly"], width=100).grid(row=0, column=3, padx=4, pady=6)
+
+        _lbl(t("config.schedule_day", default="星期：")).grid(row=0, column=4, padx=(16, 4), pady=6, sticky="w")
+        ctk.CTkOptionMenu(fields_frame, variable=self.schedule_day_var, values=["monday","tuesday","wednesday","thursday","friday","saturday","sunday"], width=110).grid(row=0, column=5, padx=4, pady=6)
+
+        _lbl(t("config.schedule_hour", default="时间：")).grid(row=0, column=6, padx=(16, 4), pady=6, sticky="w")
+        ctk.CTkEntry(fields_frame, textvariable=self.schedule_hour_var, width=60).grid(row=0, column=7, padx=4, pady=6)
+
+        # Status label
+        self.schedule_status_var = tk.StringVar(value="")
+        ctk.CTkLabel(card, textvariable=self.schedule_status_var, font=ctk.CTkFont(size=11), text_color=COL_TEXT_MUTED).grid(row=2, column=0, padx=18, pady=(0, 4), sticky="w")
+
+        btn_row = ctk.CTkFrame(card, fg_color="transparent")
+        btn_row.grid(row=3, column=0, padx=14, pady=(4, 14), sticky="w")
+
+        ctk.CTkButton(
+            btn_row,
+            text=t("config.schedule_apply", default="应用计划任务"),
+            height=34, corner_radius=8,
+            fg_color=COL_OK, hover_color="#059669",
+            command=self._apply_schedule,
+        ).pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            btn_row,
+            text=t("config.schedule_delete", default="删除计划任务"),
+            height=34, corner_radius=8,
+            fg_color="#6b7280", hover_color="#4b5563",
+            command=self._delete_schedule,
+        ).pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            btn_row,
+            text=t("config.schedule_status", default="查看状态"),
+            height=34, corner_radius=8,
+            fg_color="transparent", border_width=1, border_color=COL_BORDER,
+            text_color=COL_TEXT_NAV, hover_color=COL_HOVER,
+            command=self._refresh_schedule_status,
+        ).pack(side="left", padx=4)
+
+        # Load current schedule from config
+        try:
+            cfg = self.read_config_safely()
+            sched = cfg.get("schedule", {})
+            self.schedule_enabled_var.set("true" if sched.get("enabled", False) else "false")
+            self.schedule_freq_var.set(sched.get("frequency", "weekly"))
+            self.schedule_day_var.set(sched.get("day", "sunday"))
+            self.schedule_hour_var.set(str(sched.get("hour", 9)))
+        except Exception:
+            pass
+
+        self._refresh_schedule_status()
+
+    def _apply_schedule(self):
+        try:
+            cfg = self.read_config_safely()
+            cfg["schedule"] = {
+                "enabled": self.schedule_enabled_var.get() == "true",
+                "frequency": self.schedule_freq_var.get(),
+                "day": self.schedule_day_var.get(),
+                "hour": int(self.schedule_hour_var.get()),
+            }
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+            from desktop_agent.scheduler import apply_schedule_from_config
+            ok = apply_schedule_from_config(cfg)
+            if ok:
+                messagebox.showinfo(t("config.schedule_applied_title", default="成功"), t("config.schedule_applied_msg", default="计划任务已更新"))
+            else:
+                messagebox.showwarning(t("config.schedule_warn_title", default="注意"), t("config.schedule_warn_msg", default="配置已保存，但计划任务创建可能需要管理员权限"))
+            self._refresh_schedule_status()
+        except Exception as exc:
+            messagebox.showerror(t("config.save_failed_title"), str(exc))
+
+    def _delete_schedule(self):
+        from desktop_agent.scheduler import delete_scheduled_task
+        if messagebox.askyesno(t("config.schedule_delete_confirm_title", default="确认删除"), t("config.schedule_delete_confirm_msg", default="确认删除定时整理计划任务？")):
+            delete_scheduled_task()
+            self._refresh_schedule_status()
+
+    def _refresh_schedule_status(self):
+        try:
+            from desktop_agent.scheduler import get_task_status
+            status = get_task_status()
+            if status.get("exists"):
+                self.schedule_status_var.set(
+                    t("config.schedule_status_active", next_run=status.get("next_run", "N/A"), default=f"已启用 · 下次运行：{status.get('next_run', 'N/A')}")
+                )
+            else:
+                self.schedule_status_var.set(t("config.schedule_status_off", default="未配置计划任务"))
+        except Exception:
+            self.schedule_status_var.set("")

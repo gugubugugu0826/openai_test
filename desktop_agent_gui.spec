@@ -5,7 +5,7 @@ a = Analysis(
     ['desktop_agent_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.release.json', '.'), ('agent_memory.json', '.')],
+    datas=[('locales', 'locales'), ('config.release.json', '.'), ('agent_memory.json', '.')],
     hiddenimports=['customtkinter'],
     hookspath=[],
     hooksconfig={},

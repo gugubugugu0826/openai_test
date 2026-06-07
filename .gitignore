@@ -32,6 +32,11 @@ agent_state.json
 desktop_agent_explanation.md
 desktop_agent_explanation.json
 
+# ---------- v3.0 运行时数据（建议队列 / 增量快照 / 审核历史，均按需自动生成）----------
+suggestion_queue.json
+snapshots/
+history/
+
 # agent_memory.json 会在运行 learn 后被改写，避免反复产生改动。
 # 如果你想把“演示记忆”一并放进仓库，可改成提交一份 agent_memory.sample.json。
 agent_memory.json

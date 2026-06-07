@@ -30,6 +30,14 @@
 - 🌐 中英双语界面（GUI 右上角 中文 / ENG 一键切换）
 - 🖥️ 同时提供 GUI 和命令行（CLI）
 
+**新增功能（v3.0 功能集）**
+
+- 📁 **多来源整理**：除桌面外，可添加下载、文档、微信文件等目录一起扫描整理
+- ✦ **建议队列**：开启「建议模式」后，扫描结果先累积为建议，审阅/调整后再一次性执行，更安全
+- ♻️ **增量扫描**：来源可设为「增量」，再次扫描只处理上次之后新增的文件（适合下载、文档）
+- ⏱️ **定时整理**：在「设置 → 定时自动整理」配置 Windows 计划任务，到点自动运行
+- 🔎 **行为模式分析**：从历史纠错中识别重复习惯，主动建议新的整理记忆规则
+
 ---
 
 ## 四种分类模式
@@ -129,6 +137,15 @@ python desktop_agent_cli.py <command>
 | `state` | 查看状态 |
 | `run` | 自动执行到人工审核（scan → preview → review） |
 | `continue` | 人工审核后继续（learn → dryrun） |
+| `multi-scan` | 扫描所有启用的整理来源（多来源） |
+| `sources` | 查看整理来源配置 |
+| `suggestions` | 查看建议队列 |
+| `confirm` | 确认并执行建议队列里的项目 |
+| `analyze` | 分析历史纠错，给出整理记忆规则建议 |
+| `schedule` | 查看定时整理（Windows 计划任务）状态 |
+| `auto-run` | 定时任务入口：按配置静默执行（建议模式写队列 / 否则直接整理） |
+
+常用参数：`--intent "<整理意图>"`、`--sources "desktop,downloads"`（逗号分隔，留空=全部启用来源）、`--silent`（静默，适合定时任务）。
 
 推荐顺序：`run` → 编辑 `desktop_human_review.json` → `continue` → `apply`。
 
@@ -300,7 +317,8 @@ python tools/generate_release_manifest.py
 │  ├─ app.py                     # GUI 主应用 / 导航 / 生命周期
 │  ├─ dialogs.py                 # 首次引导、模型获取、下载进度弹窗
 │  ├─ pages_review.py            # 整理方案 Review 表格页
-│  ├─ pages_help.py              # 帮助页相关的更新检查逻辑
+│  ├─ pages_suggestions.py       # 建议队列页（确认/清空/验证路径）
+│  ├─ pages_help.py              # 帮助页（分区卡片 + 更新检查逻辑）
 │  ├─ utils.py                   # GUI 工具函数
 │  ├─ theme.py                   # 颜色常量
 │  └─ pages_*.py                 # Dashboard / Workflow / Config / Memory / Explanation / Logs 等页面
@@ -312,7 +330,7 @@ python tools/generate_release_manifest.py
 ├─ runtime/                      # llama-server.exe（不入库，见 .gitignore）
 ├─ models/                       # qwen-small.gguf（不入库，按需下载）
 └─ desktop_agent/                # 核心包
-   ├─ scanner.py                 # 扫描桌面
+   ├─ scanner.py                 # 扫描桌面 / 多来源扫描
    ├─ planner.py                 # 生成计划
    ├─ reviewer.py                # 人工审核 / 学习
    ├─ executor.py                # 执行 / 撤销
@@ -321,6 +339,11 @@ python tools/generate_release_manifest.py
    ├─ memory.py                  # 记忆规则
    ├─ plan_explainer.py          # 计划解释
    ├─ healthcheck.py             # 环境自检
+   ├─ source_manager.py          # 多来源配置（Source / 路径校验 / 快照路径）
+   ├─ incremental_scanner.py     # 增量扫描（快照存取 / 新旧对比）
+   ├─ suggestion_queue.py        # 建议队列读写 / 确认执行
+   ├─ pattern_analyzer.py        # 历史纠错分析 → 规则建议
+   ├─ scheduler.py               # Windows 计划任务创建 / 删除 / 查询
    ├─ config.py / storage.py     # 配置 / 读写
    ├─ categories.py / version.py # 分类 / 版本
    └─ workflow.py / state.py     # 流程编排 / 状态
@@ -330,7 +353,8 @@ python tools/generate_release_manifest.py
 
 `desktop_observation.json`、`desktop_agent_plan.json`、`desktop_human_review.json`、
 `desktop_action_log.json`、`agent_state.json`、`desktop_agent_explanation.md/json`、
-`logs/`、`diagnostic_reports/`、`desktop_undo_log.txt`。
+`logs/`、`diagnostic_reports/`、`desktop_undo_log.txt`、
+`suggestion_queue.json`、`snapshots/`、`history/`。
 
 ---
 

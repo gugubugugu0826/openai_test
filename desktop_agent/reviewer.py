@@ -9,6 +9,29 @@ from desktop_agent.storage import load_json, save_json
 
 
 REVIEW_FILE = "desktop_human_review.json"
+HISTORY_DIR = "history"
+MAX_HISTORY = 20
+
+
+def _save_review_history(review: dict) -> None:
+    """Save a copy of the review to history/ for pattern_analyzer."""
+    hist_dir = Path(HISTORY_DIR)
+    hist_dir.mkdir(exist_ok=True)
+
+    timestamp = now_str().replace(":", "-").replace(" ", "_")
+    dest = hist_dir / f"review_{timestamp}.json"
+    try:
+        save_json(dest, review)
+    except Exception:
+        return
+
+    # Prune old copies beyond MAX_HISTORY
+    existing = sorted(hist_dir.glob("review_*.json"), key=lambda p: p.stat().st_mtime)
+    while len(existing) > MAX_HISTORY:
+        try:
+            existing.pop(0).unlink()
+        except Exception:
+            break
 
 
 def create_human_review():
@@ -41,6 +64,8 @@ def create_human_review():
         }
         if item.get("desktop_root"):
             review_item["desktop_root"] = item.get("desktop_root")
+        if item.get("source_id"):
+            review_item["source_id"] = item.get("source_id")
         review["items"].append(review_item)
 
     save_json(REVIEW_FILE, review)
@@ -53,13 +78,22 @@ def create_human_review():
     update_state("last_review_at", t("reviewer.state_saved", path=REVIEW_FILE))
 
 
-def learn_from_review():
+def learn_from_review(save_history: bool = True) -> int:
+    """
+    Extract corrections from the current review and write new memory rules.
+    Returns the number of rules learned.
+    If save_history=True, archives the review for pattern analysis.
+    """
     review_path = Path(REVIEW_FILE)
     if not review_path.exists():
         print(t("reviewer.missing_review", path=REVIEW_FILE))
-        return
+        return 0
 
     review = load_json(REVIEW_FILE)
+
+    if save_history:
+        _save_review_history(review)
+
     memory = load_memory()
     if "rules" not in memory:
         memory["rules"] = []
@@ -125,3 +159,4 @@ def learn_from_review():
     print(t("reviewer.learn_skipped", count=skipped_count))
 
     update_state("last_learn_at", t("reviewer.learn_state", count=learned_count))
+    return learned_count

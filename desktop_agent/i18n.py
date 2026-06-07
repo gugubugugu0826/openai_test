@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import sys
 from pathlib import Path
 from tkinter import messagebox
 
@@ -10,7 +11,25 @@ from desktop_agent.categories import CATEGORIES
 
 DEFAULT_LANGUAGE = "zh"
 SUPPORTED_LANGUAGES = ("zh", "en")
-LOCALES_DIR = Path(__file__).resolve().parent.parent / "locales"
+
+def _find_locales_dir() -> Path:
+    # Normal source layout: <project>/desktop_agent/i18n.py → <project>/locales/
+    candidate = Path(__file__).resolve().parent.parent / "locales"
+    if candidate.exists():
+        return candidate
+    # PyInstaller --onefile: files extracted to sys._MEIPASS
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        mp = Path(sys._MEIPASS) / "locales"
+        if mp.exists():
+            return mp
+    # PyInstaller --onedir: exe lives next to _internal/; locales is beside the exe
+    exe_dir = Path(sys.executable).parent
+    for probe in [exe_dir / "locales", exe_dir / "_internal" / "locales"]:
+        if probe.exists():
+            return probe
+    return candidate  # fall back even if missing — error will surface at load time
+
+LOCALES_DIR = _find_locales_dir()
 
 _current_language = DEFAULT_LANGUAGE
 _original_print = builtins.print

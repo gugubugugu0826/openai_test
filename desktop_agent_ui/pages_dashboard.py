@@ -40,8 +40,13 @@ class DashboardPageMixin:
 
         self.home_scan_var = tk.StringVar(value="-")
         self.home_target_var = tk.StringVar(value="-")
+        self.home_suggestions_var = tk.StringVar(value="-")
+        self.home_schedule_var = tk.StringVar(value="-")
+        summary.grid_columnconfigure((0, 1, 2, 3), weight=1)
         self._mini_card(summary, 0, t("dashboard.scan_path"), self.home_scan_var)
         self._mini_card(summary, 1, t("dashboard.target_folder"), self.home_target_var)
+        self._mini_card(summary, 2, t("dashboard.pending_suggestions", default="待确认建议"), self.home_suggestions_var)
+        self._mini_card(summary, 3, t("dashboard.next_schedule", default="下次自动整理"), self.home_schedule_var)
 
         self._step_badge_vars = [tk.StringVar(value=""), tk.StringVar(value=""), tk.StringVar(value="")]
         steps = [
@@ -80,6 +85,8 @@ class DashboardPageMixin:
             command=self.open_target_folder,
         ).pack(side="left", padx=6)
 
+        self._show_v3_guide_if_needed(body)
+
     def _mini_card(self, parent, col, label, var):
         card = ctk.CTkFrame(parent, fg_color=COL_CARD, corner_radius=12)
         card.grid(row=0, column=col, padx=6, pady=6, sticky="ew")
@@ -111,11 +118,91 @@ class DashboardPageMixin:
         self.home_scan_var.set(scan)
         self.home_target_var.set(config.get("normal_target_root", "") or "-")
 
+        # Suggestion queue count
+        try:
+            from desktop_agent.suggestion_queue import get_pending_count
+            count = get_pending_count()
+            self.home_suggestions_var.set(f"{count} 条" if count > 0 else t("dashboard.no_suggestions", default="暂无"))
+        except Exception:
+            self.home_suggestions_var.set("-")
+
+        # Next schedule
+        try:
+            from desktop_agent.scheduler import get_task_status
+            status = get_task_status()
+            if status.get("exists"):
+                self.home_schedule_var.set(status.get("next_run", t("dashboard.schedule_unknown", default="已启用")))
+            else:
+                self.home_schedule_var.set(t("dashboard.schedule_off", default="未启用"))
+        except Exception:
+            self.home_schedule_var.set("-")
+
         if hasattr(self, "_step_badge_vars"):
             step_files = [OBSERVATION_FILE, REVIEW_FILE, ACTION_LOG_FILE]
             step_labels = [t("dashboard.badge_scanned"), t("dashboard.badge_plan_ready"), t("dashboard.badge_applied")]
             for var, file_path, label in zip(self._step_badge_vars, step_files, step_labels):
                 var.set(label if file_path.exists() else "")
+
+    def _show_v3_guide_if_needed(self, body):
+        """Show a dismissible v3.0 new features card if not yet dismissed."""
+        config = self.read_config_safely()
+        if config.get("v3_guide_dismissed"):
+            return
+        self._v3_guide_card = ctk.CTkFrame(body, fg_color="#eff6ff", corner_radius=14)
+        self._v3_guide_card.grid(row=6, column=0, padx=6, pady=(8, 0), sticky="ew")
+        self._v3_guide_card.grid_columnconfigure(0, weight=1)
+
+        hdr = ctk.CTkFrame(self._v3_guide_card, fg_color="transparent")
+        hdr.grid(row=0, column=0, columnspan=2, padx=16, pady=(14, 4), sticky="ew")
+        hdr.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            hdr,
+            text=t("dashboard.v3_guide_title", default="v3.0 新功能 — 快速上手"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#1e40af",
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkButton(
+            hdr,
+            text=t("dashboard.v3_guide_dismiss", default="知道了，不再显示"),
+            width=130, height=28, corner_radius=6,
+            fg_color="transparent", border_width=1, border_color="#93c5fd",
+            text_color="#1d4ed8", hover_color="#dbeafe",
+            command=self._dismiss_v3_guide,
+        ).grid(row=0, column=1, sticky="e")
+
+        items = [
+            t("dashboard.v3_tip1", default="💡 建议队列：在「设置」里开启建议模式 → 扫描 → 审阅建议再执行，更安全"),
+            t("dashboard.v3_tip2", default="📁 多来源：可添加下载、文档等目录一起整理，不局限于桌面"),
+            t("dashboard.v3_tip3", default="⏱ 定时整理：在「设置 → 定时自动整理」配置 Windows 计划任务自动运行"),
+            t("dashboard.v3_tip4", default="🧠 意图输入：在「高级操作」页填写本次整理目的，AI 会优先考虑你的意图"),
+        ]
+        for i, tip in enumerate(items):
+            ctk.CTkLabel(
+                self._v3_guide_card,
+                text=tip,
+                font=ctk.CTkFont(size=12),
+                text_color="#1e40af",
+                anchor="w",
+                justify="left",
+                wraplength=700,
+            ).grid(row=i + 1, column=0, columnspan=2, padx=22, pady=2, sticky="w")
+
+        ctk.CTkFrame(self._v3_guide_card, fg_color="transparent", height=10).grid(row=len(items) + 1, column=0)
+
+    def _dismiss_v3_guide(self):
+        try:
+            import json
+            from pathlib import Path
+            cfg_path = Path("config.json")
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+            data["v3_guide_dismissed"] = True
+            cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        if hasattr(self, "_v3_guide_card"):
+            self._v3_guide_card.destroy()
 
     def start_scan(self):
         self.run_command("run", guided=True, busy_text=t("dashboard.scan_busy"), on_done=self._after_scan_done)
@@ -220,3 +307,25 @@ class DashboardPageMixin:
         ).grid(row=rrow, column=0, padx=18, pady=(6, 12), sticky="w")
 
         self.status_var.set(t("dashboard.status_ready") if all_ok else t("dashboard.status_issues", count=len(fails)))
+
+    def _check_pattern_suggestions_startup(self):
+        def _run():
+            try:
+                from desktop_agent.pattern_analyzer import analyze_correction_history
+                suggestions = analyze_correction_history()
+                if suggestions:
+                    self.root.after(0, lambda: self._show_pattern_suggestions_dialog(suggestions))
+            except Exception:
+                pass
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _show_pattern_suggestions_dialog(self, suggestions):
+        if not suggestions:
+            return
+        texts = [s.suggestion_text for s in suggestions[:5]]
+        msg = "\n".join(f"{i + 1}. {txt}" for i, txt in enumerate(texts))
+        if len(suggestions) > 5:
+            msg += f"\n...还有 {len(suggestions) - 5} 条"
+        msg += "\n\n是否打开记忆页面查看并确认这些规则建议？"
+        if messagebox.askyesno(t("pattern.dialog_title", default="发现规则建议"), msg):
+            self.show_page("Memory")

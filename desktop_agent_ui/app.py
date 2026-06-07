@@ -81,6 +81,7 @@ from desktop_agent_ui.pages_memory import MemoryPageMixin
 from desktop_agent_ui.pages_explanation import ExplanationPageMixin
 from desktop_agent_ui.pages_logs import LogsPageMixin
 from desktop_agent_ui.pages_help import HelpPageMixin
+from desktop_agent_ui.pages_suggestions import SuggestionsPageMixin
 
 try:
     from desktop_agent.version import APP_NAME, APP_VERSION
@@ -155,13 +156,15 @@ class DesktopAgentGUI(
     ExplanationPageMixin,
     LogsPageMixin,
     HelpPageMixin,
+    SuggestionsPageMixin,
 ):
     # 主导航（普通用户）
     PRIMARY_NAV = [
-        ("Home",     "nav.home"),
-        ("Review",   "nav.review"),
-        ("Settings", "nav.settings"),
-        ("Help",     "nav.help"),
+        ("Home",        "nav.home"),
+        ("Suggestions", "nav.suggestions"),
+        ("Review",      "nav.review"),
+        ("Settings",    "nav.settings"),
+        ("Help",        "nav.help"),
     ]
     # 高级导航（折叠在分隔线下方）
     ADVANCED_NAV = [
@@ -173,6 +176,7 @@ class DesktopAgentGUI(
     # 每个页面对应的 Unicode 图标
     NAV_ICONS = {
         "Home":        "⌂",
+        "Suggestions": "✦",
         "Review":      "≡",
         "Settings":    "⚙",
         "Help":        "？",
@@ -255,6 +259,7 @@ class DesktopAgentGUI(
 
         self.root.after(300, self.show_first_run_wizard_if_needed)
         self.root.after(1800, self.auto_check_updates_if_needed)
+        self.root.after(2500, self._check_pattern_suggestions_startup)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # =====================================================
@@ -517,6 +522,7 @@ class DesktopAgentGUI(
     def build_pages(self):
         builders = {
             "Home": self.build_home_page,
+            "Suggestions": self.build_suggestions_page,
             "Review": self.build_review_page,
             "Settings": self.build_config_page,
             "Help": self.build_help_page,

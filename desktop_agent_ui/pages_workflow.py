@@ -18,7 +18,7 @@ from desktop_agent.executor import dryrun_plan, apply_plan, undo_last_action
 from desktop_agent.memory import show_memory
 from desktop_agent.state import show_state
 from desktop_agent.workflow import run_workflow
-from desktop_agent_ui.utils import get_effective_scan_paths, format_scan_paths
+from desktop_agent_ui.utils import get_effective_scan_paths, format_scan_paths, QueueWriter
 from desktop_agent_ui.theme import *
 
 OBSERVATION_FILE = Path("desktop_observation.json")
@@ -83,9 +83,62 @@ class WorkflowPageMixin:
             command=self.update_dashboard,
         ).grid(row=4, column=0, padx=16, pady=(4, 14), sticky="w")
 
+        # ── 3.0: 整理意图 + 模式预设 ────────────────────────────────
+        intent_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
+        intent_card.grid(row=1, column=0, padx=6, pady=(0, 8), sticky="ew")
+        intent_card.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            intent_card,
+            text=t("workflow.intent_title", default="整理意图（可选）"),
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=COL_TEXT,
+        ).grid(row=0, column=0, columnspan=3, padx=16, pady=(14, 4), sticky="w")
+
+        ctk.CTkLabel(intent_card, text=t("workflow.intent_label", default="意图："), text_color=COL_TEXT_NAV, width=60).grid(row=1, column=0, padx=(16, 4), pady=6, sticky="w")
+        self.intent_var = tk.StringVar()
+        intent_entry = ctk.CTkEntry(intent_card, textvariable=self.intent_var, placeholder_text=t("workflow.intent_placeholder", default="例：只处理工作相关文件，游戏不动"), height=34)
+        intent_entry.grid(row=1, column=1, padx=(0, 16), pady=6, sticky="ew")
+
+        mode_frame = ctk.CTkFrame(intent_card, fg_color="transparent")
+        mode_frame.grid(row=2, column=0, columnspan=3, padx=10, pady=(0, 12), sticky="w")
+        ctk.CTkLabel(mode_frame, text=t("workflow.mode_presets", default="快速模式："), text_color=COL_TEXT_MUTED, font=ctk.CTkFont(size=12)).pack(side="left", padx=(6, 8))
+
+        presets = [
+            (t("workflow.mode_work", default="工作模式"), "只整理工作相关文件（代码、文档、报告），跳过游戏和娱乐"),
+            (t("workflow.mode_study", default="学习模式"), "优先整理课程资料、作业报告、学习笔记"),
+            (t("workflow.mode_cleanup", default="大扫除"), "全部类型都处理，不跳过任何文件"),
+        ]
+        for label, intent_text in presets:
+            ctk.CTkButton(
+                mode_frame,
+                text=label,
+                height=30,
+                corner_radius=8,
+                fg_color="transparent",
+                border_width=1,
+                border_color=COL_BORDER,
+                text_color=COL_TEXT_NAV,
+                hover_color=COL_HOVER,
+                command=lambda it=intent_text: self.intent_var.set(it),
+            ).pack(side="left", padx=4)
+
+        # 策略摘要显示区
+        self.strategy_summary_var = tk.StringVar(value="")
+        self.strategy_summary_label = ctk.CTkLabel(
+            intent_card,
+            textvariable=self.strategy_summary_var,
+            font=ctk.CTkFont(size=12),
+            text_color=COL_TEXT_MUTED,
+            justify="left",
+            wraplength=900,
+            anchor="w",
+        )
+        self.strategy_summary_label.grid(row=3, column=0, columnspan=3, padx=16, pady=(0, 10), sticky="ew")
+
         # 单步命令卡
         cmd_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
-        cmd_card.grid(row=1, column=0, padx=6, pady=10, sticky="ew")
+        cmd_card.grid(row=2, column=0, padx=6, pady=10, sticky="ew")
         ctk.CTkLabel(
             cmd_card, text=t("workflow.commands_title"), font=ctk.CTkFont(size=16, weight="bold"),
             text_color=COL_TEXT,
@@ -97,7 +150,7 @@ class WorkflowPageMixin:
         commands = [
             (t("workflow.health_check"), lambda: self.run_command("check"), COL_ACCENT),
             (t("workflow.scan"), lambda: self.run_command("scan"), COL_ACCENT),
-            (t("workflow.preview"), lambda: self.run_command("preview"), COL_ACCENT),
+            (t("workflow.preview"), lambda: self.run_command_with_intent("preview"), COL_ACCENT),
             (t("workflow.create_review"), lambda: self.run_command("review"), COL_ACCENT),
             (t("workflow.run_workflow"), lambda: self.run_command("run"), COL_ACCENT),
             (t("workflow.learn"), lambda: self.run_command("learn"), "#7c3aed"),
@@ -115,7 +168,7 @@ class WorkflowPageMixin:
 
         # 诊断 / 文件卡
         diag_card = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
-        diag_card.grid(row=2, column=0, padx=6, pady=10, sticky="ew")
+        diag_card.grid(row=3, column=0, padx=6, pady=10, sticky="ew")
         ctk.CTkLabel(
             diag_card, text=t("workflow.diagnostics_title"), font=ctk.CTkFont(size=16, weight="bold"),
             text_color=COL_TEXT,
@@ -198,6 +251,38 @@ class WorkflowPageMixin:
             "run": run_workflow,
         }
         return handlers.get(command)
+
+    def run_command_with_intent(self, command):
+        """Run preview with the current intent text."""
+        intent = getattr(self, "intent_var", None)
+        intent_text = intent.get().strip() if intent else ""
+        if intent_text and command == "preview":
+            if self.running:
+                messagebox.showwarning(t("workflow.already_running_title"), t("workflow.already_running_message"))
+                return
+            self.running = True
+            self.status_var.set(t("workflow.running_status", command=command))
+            self.show_page("Logs")
+            from datetime import datetime
+            self.append_output(f"\n{'=' * 90}\nRunning Agent command: {command}\nIntent: {intent_text}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n{'=' * 90}\n")
+
+            def _worker():
+                try:
+                    from contextlib import redirect_stdout, redirect_stderr
+                    writer = QueueWriter(self.output_queue)
+                    with redirect_stdout(writer), redirect_stderr(writer):
+                        preview_plan(user_intent=intent_text)
+                    self.output_queue.put("\n[Process finished with code 0]\n")
+                except Exception as exc:
+                    self.output_queue.put(f"\n[GUI Error] {exc}\n")
+                    self.output_queue.put("\n[Process finished with code 1]\n")
+                finally:
+                    self.output_queue.put("__TASK_DONE__")
+
+            import threading as _threading
+            _threading.Thread(target=_worker, daemon=True).start()
+        else:
+            self.run_command(command)
 
     def run_command(self, command, guided=False, on_done=None, busy_text=None):
         if self.running:

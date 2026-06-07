@@ -229,11 +229,15 @@ def clean_old_build():
 
 
 def build_with_pyinstaller():
-    # 注意：这里只把 config 和 memory 作为 add-data 打进去，
-    # runtime/ 和 models/ 不走 PyInstaller，而是打包后再按需复制（见 create_release_folder）。
+    # locales/ 必须打进去，否则 i18n.t() 找不到翻译文件，所有文本都会显示原始 key。
+    # --onedir 模式下 PyInstaller 把 --add-data 的内容放在 _internal/ 下，
+    # i18n.py 用 Path(__file__).parent.parent/"locales" 刚好指向 _internal/locales/。
+    #
+    # runtime/ 和 models/ 不走 PyInstaller，打包后再按需复制（见 create_release_folder）。
     command = (
         'pyinstaller --onedir --windowed '
         '--hidden-import customtkinter '
+        '--add-data "locales;locales" '
         '--add-data "config.release.json;." '
         '--add-data "agent_memory.json;." '
         'desktop_agent_gui.py'
@@ -354,6 +358,7 @@ def verify_release_folder():
     required_paths = [
         RELEASE_DIR / f"{APP_NAME}.exe",
         RELEASE_DIR / "_internal",
+        RELEASE_DIR / "_internal" / "locales",
         RELEASE_DIR / "config.json",
         RELEASE_DIR / "agent_memory.json",
         RELEASE_DIR / "README_使用说明.txt",

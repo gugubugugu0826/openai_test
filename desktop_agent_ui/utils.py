@@ -1,6 +1,19 @@
 from pathlib import Path
 
 
+class QueueWriter:
+    """Redirect stdout/stderr into a queue for the GUI log pane."""
+    def __init__(self, output_queue):
+        self.output_queue = output_queue
+
+    def write(self, text):
+        if text:
+            self.output_queue.put(text)
+
+    def flush(self):
+        pass
+
+
 def get_effective_scan_paths(desktop_path=""):
     desktop_path = str(desktop_path or "").strip()
 
