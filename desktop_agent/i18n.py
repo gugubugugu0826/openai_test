@@ -20,18 +20,16 @@ _runtime_patched = False
 
 
 def _load_locale(language: str) -> dict:
-    path = LOCALES_DIR / f"{language}.json"
-    if not path.exists():
-        return {"translations": {}, "categories": {}, "substrings": {}}
-
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    return {
-        "translations": data.get("translations", {}),
-        "categories": data.get("categories", {}),
-        "substrings": data.get("substrings", {}),
-    }
+    merged = {"translations": {}, "categories": {}, "substrings": {}}
+    for path in sorted(LOCALES_DIR.glob(f"{language}*.json")):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for bucket in merged:
+            merged[bucket].update(data.get(bucket, {}))
+        # Backward compatibility for older locale files that stored UI text
+        # under a separate "ui" bucket.
+        merged["translations"].update(data.get("ui", {}))
+    return merged
 
 
 def _load_locales():

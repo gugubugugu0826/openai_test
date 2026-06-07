@@ -1,9 +1,8 @@
-# desktop_agent/state.py
-
 from datetime import datetime
 from pathlib import Path
 
-from desktop_agent.storage import save_json, load_json
+from desktop_agent.i18n import t
+from desktop_agent.storage import load_json, save_json
 
 
 STATE_FILE = "agent_state.json"
@@ -22,7 +21,7 @@ def default_state():
         "last_dryrun_at": "",
         "last_apply_at": "",
         "last_undo_at": "",
-        "notes": []
+        "notes": [],
     }
 
 
@@ -52,10 +51,7 @@ def update_state(key, note=None):
 
     if note:
         state.setdefault("notes", [])
-        state["notes"].append({
-            "time": now_str(),
-            "note": note
-        })
+        state["notes"].append({"time": now_str(), "note": note})
 
     save_state(state)
 
@@ -64,7 +60,7 @@ def show_state():
     state = load_state()
 
     print("=" * 80)
-    print("Agent State：当前状态")
+    print(t("state.header"))
     print("=" * 80)
 
     print(f"last_scan_at:    {state.get('last_scan_at', '')}")
@@ -76,9 +72,8 @@ def show_state():
     print(f"last_undo_at:    {state.get('last_undo_at', '')}")
 
     notes = state.get("notes", [])
-
     if notes:
-        print("\n最近记录：")
+        print("\n" + t("state.recent_notes"))
         for note in notes[-5:]:
             print(f"- {note.get('time')}: {note.get('note')}")
 
@@ -86,10 +81,10 @@ def show_state():
 def require_file(file_path, hint):
     if not Path(file_path).exists():
         print("=" * 80)
-        print("Agent 状态检查失败")
+        print(t("state.check_failed_title"))
         print("=" * 80)
-        print(f"缺少文件：{file_path}")
-        print(f"建议先运行：{hint}")
+        print(t("state.missing_file", path=file_path))
+        print(t("state.suggestion", hint=hint))
         return False
 
     return True

@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
+from desktop_agent.i18n import t
 
 try:
     from desktop_agent.builtin_llm import get_builtin_config
@@ -79,19 +80,19 @@ class ModelDownloadMixin:
             return
 
         wizard = ctk.CTkToplevel(self.root)
-        wizard.title("欢迎使用")
+        wizard.title(t("dialogs.welcome_title"))
         wizard.geometry("560x540")
         wizard.transient(self.root)
         wizard.grab_set()
 
         ctk.CTkLabel(
             wizard,
-            text="桌面整理助手",
+            text=t("app.title"),
             font=ctk.CTkFont(size=24, weight="bold"),
         ).pack(pady=(24, 8))
         ctk.CTkLabel(
             wizard,
-            text="先确认整理目录和分类方式，之后就可以开始整理桌面。",
+            text=t("dialogs.welcome_subtitle"),
             text_color=COL_TEXT_MUTED,
         ).pack(pady=(0, 18))
 
@@ -100,27 +101,27 @@ class ModelDownloadMixin:
 
         target_var = tk.StringVar(value=config.get("normal_target_root", "") or "D:\\Desktop_Sorted")
 
-        ctk.CTkLabel(box, text="整理目标目录", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=18, pady=(16, 6))
+        ctk.CTkLabel(box, text=t("dialogs.target_folder"), font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=18, pady=(16, 6))
         row = ctk.CTkFrame(box, fg_color="transparent")
         row.pack(fill="x", padx=18, pady=(0, 14))
         ctk.CTkEntry(row, textvariable=target_var).pack(side="left", fill="x", expand=True)
 
         def pick_target():
-            selected = filedialog.askdirectory(title="选择整理目标目录")
+            selected = filedialog.askdirectory(title=t("dialogs.pick_target"))
             if selected:
                 target_var.set(selected)
 
-        ctk.CTkButton(row, text="浏览", width=70, command=pick_target).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(row, text=t("common.browse"), width=70, command=pick_target).pack(side="left", padx=(8, 0))
 
         mode_var = tk.StringVar(value="builtin")
         mode_box = ctk.CTkFrame(wizard, fg_color="transparent")
         mode_box.pack(fill="x", padx=28, pady=10)
 
-        ctk.CTkLabel(mode_box, text="分类方式", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(0, 8))
+        ctk.CTkLabel(mode_box, text=t("dialogs.mode_title"), font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(0, 8))
 
         for value, title, desc in [
-            ("builtin", "智能分类（推荐）", "使用自带 AI。没有模型时会引导下载或选择本地模型。"),
-            ("none", "极速规则分类", "不使用 AI，完全离线，速度最快。"),
+            ("builtin", t("dialogs.mode_builtin_title"), t("dialogs.mode_builtin_desc")),
+            ("none", t("dialogs.mode_none_title"), t("dialogs.mode_none_desc")),
         ]:
             card = ctk.CTkFrame(mode_box, fg_color=COL_CARD, corner_radius=12)
             card.pack(fill="x", pady=5)
@@ -151,7 +152,7 @@ class ModelDownloadMixin:
                 self.refresh_home_status()
                 self.show_page("Home")
 
-        ctk.CTkButton(wizard, text="开始使用", height=40, corner_radius=8, command=finish).pack(pady=20)
+        ctk.CTkButton(wizard, text=t("dialogs.get_started"), height=40, corner_radius=8, command=finish).pack(pady=20)
 
     def update_config_provider(self, provider, target_root=None):
         config = self.read_config_safely()
@@ -166,7 +167,7 @@ class ModelDownloadMixin:
 
     def open_model_setup(self, on_done=None, allow_skip=True):
         dlg = ctk.CTkToplevel(self.root)
-        dlg.title("获取 AI 模型")
+        dlg.title(t("dialogs.model_setup_title"))
         dlg.geometry("620x560")
         dlg.minsize(620, 520)
         dlg.transient(self.root)
@@ -174,12 +175,12 @@ class ModelDownloadMixin:
 
         ctk.CTkLabel(
             dlg,
-            text="获取 AI 模型",
+            text=t("dialogs.model_setup_title"),
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(pady=(24, 8))
         ctk.CTkLabel(
             dlg,
-            text="智能分类需要一个本地 GGUF 模型。你可以直接下载，也可以选择已经下载好的模型文件。",
+            text=t("dialogs.model_setup_subtitle"),
             text_color=COL_TEXT_MUTED, justify="left",
             wraplength=480,
         ).pack(pady=(0, 18))
@@ -204,28 +205,28 @@ class ModelDownloadMixin:
             ).grid(row=0, column=1, padx=16, pady=12)
 
         option(
-            "现在下载",
-            f"自动下载到 {target}。首次下载约 1GB，之后可离线使用。",
-            "下载",
+            t("dialogs.model_download_title"),
+            t("dialogs.model_download_desc", path=target),
+            t("dialogs.download"),
             lambda: self._start_model_download(dlg, on_done),
             True,
         )
         option(
-            "我已有模型文件",
-            "选择本地 .gguf 文件并复制到程序模型目录。",
-            "选择文件",
+            t("dialogs.model_pick_title"),
+            t("dialogs.model_pick_desc"),
+            t("dialogs.choose_file"),
             lambda: self._pick_model_file(dlg, on_done),
         )
 
         if allow_skip:
             option(
-                "暂时跳过",
-                "先使用极速规则分类，之后可在设置里切回智能分类。",
-                "跳过",
+                t("dialogs.model_skip_title"),
+                t("dialogs.model_skip_desc"),
+                t("common.skip"),
                 lambda: self._skip_model(dlg, on_done),
             )
 
-        cancel_btn = ctk.CTkButton(modal := dlg, text="取消", height=32, corner_radius=8, fg_color="#6b7280", hover_color="#4b5563")
+        cancel_btn = ctk.CTkButton(modal := dlg, text=t("common.cancel"), height=32, corner_radius=8, fg_color="#6b7280", hover_color="#4b5563")
         cancel_btn.configure(command=lambda: (modal.grab_release(), modal.destroy()))
         cancel_btn.pack(pady=(10, 18))
 
@@ -245,8 +246,8 @@ class ModelDownloadMixin:
 
     def _pick_model_file(self, dlg, on_done):
         source = filedialog.askopenfilename(
-            title="选择 GGUF 模型文件",
-            filetypes=[("GGUF 模型", "*.gguf"), ("所有文件", "*.*")],
+            title=t("dialogs.pick_gguf_title"),
+            filetypes=[(t("dialogs.gguf_files"), "*.gguf"), (t("dialogs.all_files"), "*.*")],
         )
         if not source:
             return
@@ -263,8 +264,8 @@ class ModelDownloadMixin:
         urls = self.get_model_urls()
         if not urls:
             messagebox.showwarning(
-                "没有下载地址",
-                "当前没有配置模型下载地址。请在设置里填写 builtin_model_url，或选择本地模型文件。"
+                t("dialogs.no_model_url_title"),
+                t("dialogs.no_model_url_message")
             )
             return
         target = self.get_model_file_path()
@@ -278,7 +279,7 @@ class ModelDownloadMixin:
 
     def _make_transfer_modal(self, title):
         modal = ctk.CTkToplevel(self.root)
-        modal.title("请稍候")
+        modal.title(t("workflow.please_wait"))
         modal.geometry("460x200")
         modal.transient(self.root)
         modal.resizable(False, False)
@@ -291,9 +292,9 @@ class ModelDownloadMixin:
         pb = ctk.CTkProgressBar(modal, width=416)
         pb.set(0)
         pb.pack(padx=22, pady=(0, 10))
-        status = tk.StringVar(value="准备中...")
+        status = tk.StringVar(value=t("workflow.preparing"))
         ctk.CTkLabel(modal, textvariable=status, text_color=COL_TEXT_MUTED).pack(padx=22, pady=(0, 10), anchor="w")
-        cancel_btn = ctk.CTkButton(modal, text="取消", height=32, corner_radius=8, fg_color="#6b7280", hover_color="#4b5563")
+        cancel_btn = ctk.CTkButton(modal, text=t("common.cancel"), height=32, corner_radius=8, fg_color="#6b7280", hover_color="#4b5563")
         cancel_btn.pack(padx=22, pady=(0, 14), anchor="e")
         return {"modal": modal, "pb": pb, "status": status, "cancel_btn": cancel_btn}
 
@@ -303,7 +304,7 @@ class ModelDownloadMixin:
                 modal["pb"].set(min(done / total, 1.0))
                 modal["status"].set(f"{done / 1024 / 1024:.1f} / {total / 1024 / 1024:.1f} MB")
             else:
-                modal["status"].set(f"已处理 {done / 1024 / 1024:.1f} MB")
+                modal["status"].set(t("dialogs.processed_mb", done=f"{done / 1024 / 1024:.1f}"))
         except Exception:
             pass
 
@@ -323,14 +324,14 @@ class ModelDownloadMixin:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
             self.load_config_panel()
-            messagebox.showinfo("完成", "AI 模型已就位，智能分类已启用。")
+            messagebox.showinfo(t("common.done"), t("dialogs.model_ready_message"))
             if on_done:
                 on_done()
         else:
-            messagebox.showerror("失败", str(err))
+            messagebox.showerror(t("common.failed"), str(err))
 
     def _run_copy_with_progress(self, src, target, on_done):
-        modal = self._make_transfer_modal("正在复制模型文件...")
+        modal = self._make_transfer_modal(t("dialogs.copying_model"))
         state = {"cancel": False}
         modal["cancel_btn"].configure(command=lambda: state.update(cancel=True))
         part = target.parent / (target.name + ".part")
@@ -342,7 +343,7 @@ class ModelDownloadMixin:
                 with open(src, "rb") as fin, open(part, "wb") as fout:
                     while True:
                         if state["cancel"]:
-                            raise RuntimeError("已取消")
+                            raise RuntimeError(t("common.cancelled"))
                         chunk = fin.read(1024 * 1024)
                         if not chunk:
                             break
@@ -367,7 +368,7 @@ class ModelDownloadMixin:
         if isinstance(urls, str):
             urls = [urls]
 
-        modal = self._make_transfer_modal("正在下载模型...")
+        modal = self._make_transfer_modal(t("dialogs.downloading_model"))
         state = {"cancel": False}
         modal["cancel_btn"].configure(command=lambda: state.update(cancel=True))
 
@@ -398,10 +399,10 @@ class ModelDownloadMixin:
 
             for idx, url in enumerate(urls, start=1):
                 if state["cancel"]:
-                    errors.append("已取消")
+                    errors.append(t("common.cancelled"))
                     break
 
-                self.root.after(0, lambda i=idx, n=total_sources: set_status(f"正在连接下载源 {i}/{n} ..."))
+                self.root.after(0, lambda i=idx, n=total_sources: set_status(t("dialogs.connecting_source", index=i, total=n)))
                 self.root.after(0, lambda: set_indeterminate(True))
 
                 try:
@@ -414,7 +415,7 @@ class ModelDownloadMixin:
                         with open(part, "wb") as f:
                             for chunk in resp.iter_content(chunk_size=1024 * 256):
                                 if state["cancel"]:
-                                    raise RuntimeError("已取消")
+                                    raise RuntimeError(t("common.cancelled"))
                                 if not chunk:
                                     continue
                                 if not got_first:
@@ -431,7 +432,7 @@ class ModelDownloadMixin:
                     self.root.after(0, lambda: self._finish_transfer(modal, True, on_done))
                     return
                 except Exception as e:
-                    errors.append(f"源 {idx}：{e}")
+                    errors.append(t("dialogs.source_error", index=idx, error=e))
                     try:
                         if part.exists():
                             part.unlink()
@@ -441,7 +442,7 @@ class ModelDownloadMixin:
                         break
                     continue
 
-            msg = "；".join(errors[-2:]) if errors else "未知错误"
+            msg = "；".join(errors[-2:]) if errors else t("common.unknown_error")
             self.root.after(0, lambda m=msg: self._finish_transfer(modal, False, on_done, m))
 
         threading.Thread(target=worker, daemon=True).start()

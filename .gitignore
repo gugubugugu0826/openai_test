@@ -6,7 +6,6 @@
 # ---------- 打包产物（用 build_release.py 重新生成，发布走 GitHub Releases）----------
 build/
 dist/
-*.spec
 QwenDesktopAgent_*/
 QwenDesktopAgent_*.zip
 *.exe

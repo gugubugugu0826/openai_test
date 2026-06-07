@@ -9,39 +9,23 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from desktop_agent.i18n import get_language
+from desktop_agent.i18n import t
 from desktop_agent_ui.theme import *
 
 
 PROJECT_DIR = Path.cwd()
 CONFIG_FILE = Path("config.json")
-LOG_DIR = Path("logs")
-OBSERVATION_FILE = Path("desktop_observation.json")
-PLAN_FILE = Path("desktop_agent_plan.json")
-REVIEW_FILE = Path("desktop_human_review.json")
-ACTION_LOG_FILE = Path("desktop_action_log.json")
-STATE_FILE = Path("agent_state.json")
-MEMORY_FILE = Path("agent_memory.json")
-EXPLANATION_MD_FILE = Path("desktop_agent_explanation.md")
-EXPLANATION_JSON_FILE = Path("desktop_agent_explanation.json")
 
 try:
     from desktop_agent.version import APP_NAME, APP_VERSION
 except Exception:
     APP_NAME = "Qwen Desktop Organizer Agent"
-    APP_VERSION = "v2.1"
+    APP_VERSION = "v2.2"
 
 
 class LogsPageMixin:
-    def _lang(self, zh, en):
-        return en if get_language() == "en" else zh
-
     def build_logs_page(self, parent):
-        self.page_header(
-            parent,
-            "运行日志",
-            "查看运行输出、打开日志文件、生成诊断报告。",
-        )
+        self.page_header(parent, t("logs.page_title"), t("logs.page_subtitle"))
 
         body = ctk.CTkFrame(parent, fg_color="transparent")
         body.grid(row=1, column=0, padx=18, pady=(0, 20), sticky="nsew")
@@ -52,43 +36,23 @@ class LogsPageMixin:
         summary.grid(row=0, column=0, padx=6, pady=(6, 8), sticky="ew")
         summary.grid_columnconfigure(0, weight=1)
 
-        self.log_status_var = ctk.StringVar(value=self._default_logs_status())
+        self.log_status_var = ctk.StringVar(value=t("logs.default_status"))
         self.log_file_var = ctk.StringVar(value=self._default_log_file_text())
 
-        ctk.CTkLabel(
-            summary,
-            text="日志与诊断",
-            font=("Microsoft YaHei UI", 14, "bold"),
-            text_color=COL_TEXT,
-        ).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
-        ctk.CTkLabel(
-            summary,
-            textvariable=self.log_status_var,
-            font=("Microsoft YaHei UI", 11),
-            text_color=COL_TEXT_MUTED,
-            wraplength=980,
-            justify="left",
-        ).grid(row=1, column=0, padx=18, pady=(0, 2), sticky="w")
-        ctk.CTkLabel(
-            summary,
-            textvariable=self.log_file_var,
-            font=("Microsoft YaHei UI", 11),
-            text_color=COL_TEXT_MUTED,
-            wraplength=980,
-            justify="left",
-        ).grid(row=2, column=0, padx=18, pady=(0, 14), sticky="w")
+        ctk.CTkLabel(summary, text=t("logs.section_title"), font=("Microsoft YaHei UI", 14, "bold"), text_color=COL_TEXT).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
+        ctk.CTkLabel(summary, textvariable=self.log_status_var, font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED, wraplength=980, justify="left").grid(row=1, column=0, padx=18, pady=(0, 2), sticky="w")
+        ctk.CTkLabel(summary, textvariable=self.log_file_var, font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED, wraplength=980, justify="left").grid(row=2, column=0, padx=18, pady=(0, 14), sticky="w")
 
         actions = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         actions.grid(row=1, column=0, padx=6, pady=6, sticky="ew")
-
         action_row = ctk.CTkFrame(actions, fg_color="transparent")
         action_row.grid(row=0, column=0, padx=12, pady=12, sticky="w")
 
         button_specs = [
-            ("打开 logs 文件夹", self.open_logs_folder, None),
-            ("打开当前日志", self.open_current_log_file, None),
-            ("生成错误报告包", self.create_diagnostic_report, None),
-            ("清空输出窗口", self.clear_output, "#6b7280"),
+            (t("logs.open_folder"), self.open_logs_folder, None),
+            (t("logs.open_current"), self.open_current_log_file, None),
+            (t("logs.create_report"), self.create_diagnostic_report, None),
+            (t("logs.clear_output"), self.clear_output, "#6b7280"),
         ]
         for idx, (text, command, color) in enumerate(button_specs):
             kwargs = {"text": text, "corner_radius": 8, "width": 170, "command": command}
@@ -102,20 +66,8 @@ class LogsPageMixin:
         console_card.grid_rowconfigure(2, weight=1)
         console_card.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            console_card,
-            text="实时输出",
-            font=("Microsoft YaHei UI", 14, "bold"),
-            text_color=COL_TEXT,
-        ).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
-        ctk.CTkLabel(
-            console_card,
-            text=self._console_intro_text(),
-            font=("Microsoft YaHei UI", 11),
-            text_color=COL_TEXT_MUTED,
-            wraplength=980,
-            justify="left",
-        ).grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
+        ctk.CTkLabel(console_card, text=t("logs.live_output_title"), font=("Microsoft YaHei UI", 14, "bold"), text_color=COL_TEXT).grid(row=0, column=0, padx=18, pady=(14, 2), sticky="w")
+        ctk.CTkLabel(console_card, text=t("logs.live_output_intro"), font=("Microsoft YaHei UI", 11), text_color=COL_TEXT_MUTED, wraplength=980, justify="left").grid(row=1, column=0, padx=18, pady=(0, 8), sticky="w")
 
         console_surface = ctk.CTkFrame(console_card, fg_color="#111827", corner_radius=12)
         console_surface.grid(row=2, column=0, padx=18, pady=(0, 18), sticky="nsew")
@@ -131,45 +83,23 @@ class LogsPageMixin:
             border_width=0,
         )
         self.output_text.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
-
         self.refresh_logs_summary()
 
-    def _default_logs_status(self):
-        if get_language() == "en":
-            return "Runtime output appears below in real time. It is a good idea to skim the key lines before you run Apply."
-        return "运行输出会实时显示在下方日志窗口。建议在执行 Apply 前先看一遍关键输出。"
-
     def _default_log_file_text(self):
-        if get_language() == "en":
-            return "Current log file: not created yet"
-        return "当前日志文件：尚未创建"
-
-    def _console_intro_text(self):
-        if get_language() == "en":
-            return "This panel shows scan, planning, apply, and model-runtime output."
-        return "这里会显示扫描、生成方案、应用整理和模型运行过程中的输出。"
+        return t("logs.current_log_none")
 
     def refresh_logs_summary(self):
         if hasattr(self, "log_status_var"):
-            self.log_status_var.set(self._default_logs_status())
+            self.log_status_var.set(t("logs.default_status"))
         if hasattr(self, "log_file_var"):
             if getattr(self, "current_log_file", None):
-                prefix = "Current log file: " if get_language() == "en" else "当前日志文件："
-                self.log_file_var.set(f"{prefix}{self.current_log_file}")
+                self.log_file_var.set(t("logs.current_log_prefix", path=str(self.current_log_file)))
             else:
                 self.log_file_var.set(self._default_log_file_text())
 
     def sanitize_config_for_report(self, config):
         safe_config = dict(config)
-        for key in [
-            "api_key",
-            "openai_api_key",
-            "deepseek_api_key",
-            "qwen_api_key",
-            "authorization",
-            "token",
-            "access_token",
-        ]:
+        for key in ["api_key", "openai_api_key", "deepseek_api_key", "qwen_api_key", "authorization", "token", "access_token"]:
             if key in safe_config and safe_config[key]:
                 safe_config[key] = "***REDACTED***"
         return safe_config
@@ -227,45 +157,31 @@ class LogsPageMixin:
                         zipf.write(file_path, file_path.relative_to(temp_dir))
 
             shutil.rmtree(temp_dir, ignore_errors=True)
-
-            messagebox.showinfo(
-                self._lang("错误报告已生成", "Diagnostic Report Created"),
-                self._lang(
-                    f"错误报告包已生成：\n{report_zip}\n\n里面的 config 已自动隐藏 API Key。",
-                    f"Diagnostic report created:\n{report_zip}\n\nAPI keys have been automatically redacted."
-                ),
-            )
+            messagebox.showinfo(t("logs.report_created_title"), t("logs.report_created_message", path=str(report_zip)))
             subprocess.Popen(f'explorer "{reports_dir}"')
-        except Exception as e:
-            messagebox.showerror(self._lang("生成错误报告失败", "Report Creation Failed"), str(e))
+        except Exception as exc:
+            messagebox.showerror(t("logs.report_failed_title"), str(exc))
 
     def open_project_folder(self):
         try:
             subprocess.Popen(f'explorer "{PROJECT_DIR}"')
-        except Exception as e:
-            messagebox.showerror("错误", str(e))
+        except Exception as exc:
+            messagebox.showerror(t("common.error_title"), str(exc))
 
     def open_target_folder(self):
         try:
             config = self.read_config_safely()
             target_root = config.get("normal_target_root", "").strip()
-
             if not target_root:
-                messagebox.showwarning(
-                    self._lang("目标目录为空", "Target Folder Not Set"),
-                    self._lang("请先在「设置」里填写整理目标目录。", "Please set the target folder in Settings first.")
-                )
+                messagebox.showwarning(t("logs.target_missing_title"), t("logs.target_missing_message"))
                 return
 
             target_path = Path(target_root)
             if not target_path.exists():
-                if not messagebox.askyesno(
-                    self._lang("目标目录不存在", "Target Folder Not Found"),
-                    self._lang(f"{target_path}\n\n是否创建？", f"{target_path}\n\nCreate it now?")
-                ):
+                if not messagebox.askyesno(t("logs.target_not_found_title"), t("logs.target_not_found_message", path=str(target_path))):
                     return
                 target_path.mkdir(parents=True, exist_ok=True)
 
             subprocess.Popen(f'explorer "{target_path}"')
-        except Exception as e:
-            messagebox.showerror(self._lang("打开整理目标目录失败", "Failed to Open Target Folder"), str(e))
+        except Exception as exc:
+            messagebox.showerror(t("logs.target_open_failed_title"), str(exc))

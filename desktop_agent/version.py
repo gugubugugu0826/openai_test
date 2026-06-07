@@ -2,4 +2,4 @@
 
 APP_NAME = "Qwen Desktop Organizer Agent"
 APP_EXE_NAME = "QwenDesktopAgent"
-APP_VERSION = "v2.1"
+APP_VERSION = "v2.2"

@@ -5,7 +5,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from desktop_agent.i18n import get_language
+from desktop_agent.i18n import t
 from desktop_agent.updater import DEFAULT_UPDATE_DIR, check_for_update, download_update_package
 from desktop_agent.version import APP_VERSION
 from desktop_agent_ui.theme import *
@@ -15,54 +15,33 @@ README_FILE = Path("README_使用说明.txt")
 
 
 class HelpPageMixin:
-    def _lang(self, zh, en):
-        return en if get_language() == "en" else zh
-
     def auto_check_updates_if_needed(self):
         config = self.read_config_safely()
-
         if not config.get("auto_check_updates", True):
             return
-
         if not str(config.get("update_manifest_url", "")).strip():
             return
-
         self.check_for_updates_gui(auto=True)
 
     def check_for_updates_gui(self, auto=False):
         if getattr(self, "checking_updates", False):
             if not auto:
-                messagebox.showwarning(
-                    self._lang("正在检查", "Checking"),
-                    self._lang("当前已经有更新检查任务在运行。", "An update check is already running.")
-                )
+                messagebox.showwarning(t("help.update.checking_title"), t("help.update.checking_message"))
             return
 
         config = self.read_config_safely()
         manifest_url = str(config.get("update_manifest_url", "")).strip()
-
         if not manifest_url:
             if not auto:
-                messagebox.showwarning(
-                    self._lang("缺少更新地址", "Missing Update URL"),
-                    self._lang(
-                        "请先在「设置」里的「软件更新」填写 update_manifest_url。\n\n"
-                        "它应当指向 GitHub Releases 最新发布 API，或 latest.json 更新清单。",
-                        "Please set update_manifest_url in Settings → Software Updates.\n\n"
-                        "It should point to a GitHub Releases API or a latest.json manifest."
-                    ),
-                )
+                messagebox.showwarning(t("help.update.missing_url_title"), t("help.update.missing_url_message"))
             return
 
         self.checking_updates = True
         self.append_output(
-            self._lang(
-                f"\n[更新] 正在检查远程更新...\n"
-                f"[更新] 当前版本：{APP_VERSION}\n"
-                f"[更新] 清单地址：{manifest_url}\n",
-                f"\n[Update] Checking for updates...\n"
-                f"[Update] Current version: {APP_VERSION}\n"
-                f"[Update] Manifest: {manifest_url}\n"
+            t(
+                "help.update.check_start_log",
+                current_version=APP_VERSION,
+                manifest_url=manifest_url,
             )
         )
 
@@ -70,17 +49,16 @@ class HelpPageMixin:
             try:
                 manifest = check_for_update(manifest_url, APP_VERSION)
                 self.root.after(0, lambda: self._handle_update_manifest(manifest, auto))
-            except Exception as e:
-                self.root.after(0, lambda msg=str(e): self._finish_update_check_error(msg, auto))
+            except Exception as exc:
+                self.root.after(0, lambda msg=str(exc): self._finish_update_check_error(msg, auto))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _finish_update_check_error(self, message, auto):
         self.checking_updates = False
-        self.append_output(self._lang(f"[更新] 检查失败：{message}\n", f"[Update] Check failed: {message}\n"))
-
+        self.append_output(t("help.update.check_failed_log", message=message))
         if not auto:
-            messagebox.showerror(self._lang("检查更新失败", "Update Check Failed"), message)
+            messagebox.showerror(t("help.update.check_failed_title"), message)
 
     def _handle_update_manifest(self, manifest, auto):
         self.checking_updates = False
@@ -88,51 +66,37 @@ class HelpPageMixin:
         notes = str(manifest.get("notes", "") or "").strip()
 
         if not manifest.get("has_update"):
-            self.append_output(self._lang(
-                f"[更新] 当前已是最新版本：{APP_VERSION}\n",
-                f"[Update] Already at the latest version: {APP_VERSION}\n"
-            ))
+            self.append_output(t("help.update.latest_log", version=APP_VERSION))
             if not auto:
-                messagebox.showinfo(
-                    self._lang("已经是最新版本", "Already Up to Date"),
-                    self._lang(f"当前版本：{APP_VERSION}", f"Current version: {APP_VERSION}")
-                )
+                messagebox.showinfo(t("help.update.latest_title"), t("help.update.latest_message", version=APP_VERSION))
             return
 
-        self.append_output(self._lang(
-            f"[更新] 发现新版本：{latest_version}\n"
-            f"[更新] 下载地址：{manifest.get('package_url')}\n",
-            f"[Update] New version available: {latest_version}\n"
-            f"[Update] Download URL: {manifest.get('package_url')}\n"
-        ))
-
-        if get_language() == "en":
-            message = (
-                f"New version: {latest_version}\n"
-                f"Current: {APP_VERSION}\n\n"
-                "Download the update now?"
+        self.append_output(
+            t(
+                "help.update.available_log",
+                version=latest_version,
+                package_url=manifest.get("package_url", ""),
             )
-            if notes:
-                message += f"\n\nRelease notes:\n{notes[:800]}"
-        else:
-            message = (
-                f"发现新版本：{latest_version}\n"
-                f"当前版本：{APP_VERSION}\n\n"
-                "是否现在下载更新包？"
-            )
-            if notes:
-                message += f"\n\n更新说明：\n{notes[:800]}"
+        )
 
-        if messagebox.askyesno(self._lang("发现新版本", "Update Available"), message):
+        message = t(
+            "help.update.available_message",
+            latest_version=latest_version,
+            current_version=APP_VERSION,
+        )
+        if notes:
+            message += "\n\n" + t("help.update.notes_prefix") + "\n" + notes[:800]
+
+        if messagebox.askyesno(t("help.update.available_title"), message):
             self.download_update_package_gui(manifest)
 
     def download_update_package_gui(self, manifest):
-        modal = self._make_transfer_modal(self._lang("正在下载更新包...", "Downloading update..."))
+        modal = self._make_transfer_modal(t("help.update.downloading"))
         state = {"cancel": False}
         modal["cancel_btn"].configure(command=lambda: state.update(cancel=True))
 
         def progress(done, total):
-            self.root.after(0, lambda d=done, t=total: self._update_transfer(modal, d, t))
+            self.root.after(0, lambda d=done, t_total=total: self._update_transfer(modal, d, t_total))
 
         def worker():
             try:
@@ -143,8 +107,8 @@ class HelpPageMixin:
                     cancel_flag=state,
                 )
                 self.root.after(0, lambda p=target, s=sha256_actual: self._finish_update_download(modal, True, p, s))
-            except Exception as e:
-                self.root.after(0, lambda msg=str(e): self._finish_update_download(modal, False, None, "", msg))
+            except Exception as exc:
+                self.root.after(0, lambda msg=str(exc): self._finish_update_download(modal, False, None, "", msg))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -159,35 +123,26 @@ class HelpPageMixin:
             pass
 
         if not ok:
-            self.append_output(self._lang(f"[更新] 下载失败：{err}\n", f"[Update] Download failed: {err}\n"))
-            messagebox.showerror(self._lang("下载更新失败", "Update Download Failed"), str(err))
+            self.append_output(t("help.update.download_failed_log", message=err))
+            messagebox.showerror(t("help.update.download_failed_title"), str(err))
             return
 
-        self.append_output(self._lang(
-            f"[更新] 更新包已下载：{target}\n"
-            f"[更新] sha256：{sha256_actual}\n",
-            f"[Update] Update downloaded: {target}\n"
-            f"[Update] sha256: {sha256_actual}\n"
-        ))
+        self.append_output(
+            t(
+                "help.update.downloaded_log",
+                target=str(target),
+                sha256=sha256_actual,
+            )
+        )
 
-        if messagebox.askyesno(
-            self._lang("更新包已下载", "Update Downloaded"),
-            self._lang(
-                f"更新包已下载到：\n{target}\n\n请关闭当前程序后，解压并运行新版。\n\n是否打开更新包所在文件夹？",
-                f"Update saved to:\n{target}\n\nClose the app, unzip the package, and run the new version.\n\nOpen the folder now?"
-            ),
-        ):
+        if messagebox.askyesno(t("help.update.downloaded_title"), t("help.update.downloaded_message", target=str(target))):
             try:
                 os.startfile(str(Path(target).parent))
-            except Exception as e:
-                messagebox.showerror(self._lang("打开文件夹失败", "Failed to Open Folder"), str(e))
+            except Exception as exc:
+                messagebox.showerror(t("help.open_folder_failed_title"), str(exc))
 
     def build_help_page(self, parent):
-        self.page_header(
-            parent,
-            "帮助",
-            "使用说明、整理流程、安全机制和常见问题。",
-        )
+        self.page_header(parent, t("help.page_title"), t("help.page_subtitle"))
 
         body = ctk.CTkFrame(parent, fg_color="transparent")
         body.grid(row=1, column=0, padx=18, pady=(0, 20), sticky="nsew")
@@ -197,9 +152,9 @@ class HelpPageMixin:
         toolbar = ctk.CTkFrame(body, fg_color=COL_CARD, corner_radius=14)
         toolbar.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
 
-        ctk.CTkButton(toolbar, text="打开 README", corner_radius=8, command=self.open_readme_file).pack(side="left", padx=8, pady=12)
-        ctk.CTkButton(toolbar, text="复制推荐流程到日志", corner_radius=8, command=self.print_quick_guide_to_log).pack(side="left", padx=8, pady=12)
-        ctk.CTkButton(toolbar, text="检查更新", corner_radius=8, fg_color="#0d9488", hover_color="#0f766e", command=self.check_for_updates_gui).pack(side="left", padx=8, pady=12)
+        ctk.CTkButton(toolbar, text=t("help.open_readme"), corner_radius=8, command=self.open_readme_file).pack(side="left", padx=8, pady=12)
+        ctk.CTkButton(toolbar, text=t("help.copy_flow"), corner_radius=8, command=self.print_quick_guide_to_log).pack(side="left", padx=8, pady=12)
+        ctk.CTkButton(toolbar, text=t("help.check_updates"), corner_radius=8, fg_color="#0d9488", hover_color="#0f766e", command=self.check_for_updates_gui).pack(side="left", padx=8, pady=12)
 
         self.help_text = ctk.CTkTextbox(
             body,
@@ -213,83 +168,17 @@ class HelpPageMixin:
         self.help_text.configure(state="disabled")
 
     def get_help_content(self):
-        if get_language() == "en":
-            return (
-                "Desktop Organizer Guide\n\n"
-                "Quick start (on the Organize Desktop page):\n"
-                "1. Check the status card at the top. If it says everything is ready, you can begin.\n"
-                "2. Click Step 1 to scan and generate a review plan. This does not move any files.\n"
-                "3. Click Step 2 to review the plan, adjust categories, or skip items.\n"
-                "4. Click Step 3 to confirm and start organizing.\n\n"
-                "Safety notes:\n"
-                "- Step 1 only generates a plan and does not move files.\n"
-                "- Step 3 shows a final summary before execution.\n"
-                "- Folders default to copy mode, so originals stay in place.\n"
-                "- API keys are redacted in diagnostic reports.\n\n"
-                "Model modes:\n"
-                "- builtin: bundled local AI, no Ollama or API key required.\n"
-                "- none: rules only, fastest, no AI.\n"
-                "- ollama: local Ollama + Qwen.\n"
-                "- openai_compatible: cloud API.\n\n"
-                "Advanced pages:\n"
-                "- Advanced: run each command step manually.\n"
-                "- Plan Explanation: inspect summary, risks, and recommendations.\n"
-                "- Logs: view output and generate a diagnostic report.\n"
-            )
-
-        return (
-            "桌面整理助手 使用说明\n\n"
-            "最简单的用法（在「整理桌面」页面）：\n"
-            "1. 看顶部状态卡，显示“一切就绪”就可以开始。\n"
-            "2. 点 ① 扫描并生成整理方案（不会移动文件）。\n"
-            "3. 点 ② 查看并调整方案，需要的话改分类或跳过。\n"
-            "4. 点 ③ 确认并开始整理，核对摘要后正式整理。\n\n"
-            "安全机制：\n"
-            "- ① 扫描只生成方案，不会移动任何文件。\n"
-            "- ③ 整理前会显示完整摘要，需要二次确认。\n"
-            "- 文件夹默认 copy（复制），原文件保留。\n"
-            "- 错误报告里的 API Key 会自动隐藏。\n\n"
-            "模型模式（在「设置 → AI 模式」里切换，普通用户用默认即可）：\n"
-            "- builtin：软件自带 AI，无需安装 Ollama 或 API Key（推荐）。\n"
-            "- none：只按规则分类，速度最快，不使用 AI。\n"
-            "- ollama：本地 Ollama + Qwen。\n"
-            "- openai_compatible：云端 API。\n\n"
-            "进阶：\n"
-            "- 「高级操作」页可单步运行 check / scan / preview / review / learn / dryrun / apply / undo。\n"
-            "- 「计划解释」页让 AI 解释本次整理计划。\n"
-            "- 「运行日志」页查看完整输出并生成诊断报告。\n"
-        )
+        return t("help.content")
 
     def open_readme_file(self):
         if not README_FILE.exists():
-            messagebox.showwarning(
-                self._lang("没有 README", "No README"),
-                self._lang("找不到 README_使用说明.txt。", "README_使用说明.txt was not found.")
-            )
+            messagebox.showwarning(t("help.no_readme_title"), t("help.no_readme_message"))
             return
 
         try:
             os.startfile(str(README_FILE))
-        except Exception as e:
-            messagebox.showerror(self._lang("打开 README 失败", "Failed to Open README"), str(e))
+        except Exception as exc:
+            messagebox.showerror(t("help.open_readme_failed_title"), str(exc))
 
     def print_quick_guide_to_log(self):
-        if get_language() == "en":
-            guide = (
-                "\nRecommended flow:\n"
-                "1. Wait until the status card says everything is ready\n"
-                "2. Step 1: Scan and generate the review plan\n"
-                "3. Step 2: Review and adjust the plan\n"
-                "4. Step 3: Confirm and start organizing\n"
-                "5. Open the target folder to inspect the result\n"
-            )
-        else:
-            guide = (
-                "\n推荐流程：\n"
-                "1. 查看状态卡，显示“一切就绪”\n"
-                "2. ① 扫描并生成整理方案\n"
-                "3. ② 查看 / 调整方案\n"
-                "4. ③ 确认并开始整理\n"
-                "5. 打开整理目录查看结果\n"
-            )
-        self.append_output(guide)
+        self.append_output(t("help.quick_flow_log"))

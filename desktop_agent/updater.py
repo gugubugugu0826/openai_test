@@ -1,5 +1,3 @@
-# desktop_agent/updater.py
-
 import hashlib
 import re
 from pathlib import Path
@@ -7,6 +5,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from desktop_agent.i18n import t
 from desktop_agent.version import APP_VERSION
 
 
@@ -32,32 +31,27 @@ def fetch_update_manifest(manifest_url, timeout=20):
     manifest_url = str(manifest_url or "").strip()
 
     if not manifest_url:
-        raise ValueError("请先在设置里填写更新清单地址 update_manifest_url")
+        raise ValueError(t("updater.missing_manifest_url"))
 
     response = requests.get(manifest_url, timeout=timeout)
     response.raise_for_status()
     data = response.json()
 
     if not isinstance(data, dict):
-        raise ValueError("更新清单格式错误：根节点必须是 JSON 对象")
+        raise ValueError(t("updater.invalid_manifest_root"))
 
     if data.get("tag_name") and isinstance(data.get("assets"), list):
         data = normalize_github_release_manifest(data)
 
     version = str(data.get("version", "")).strip()
-    package_url = (
-        data.get("package_url")
-        or data.get("download_url")
-        or data.get("url")
-        or ""
-    )
+    package_url = data.get("package_url") or data.get("download_url") or data.get("url") or ""
     package_url = str(package_url).strip()
 
     if not version:
-        raise ValueError("更新清单缺少 version")
+        raise ValueError(t("updater.missing_version"))
 
     if not package_url:
-        raise ValueError("更新清单缺少 package_url")
+        raise ValueError(t("updater.missing_package_url"))
 
     data["version"] = version
     data["package_url"] = package_url
@@ -74,7 +68,7 @@ def normalize_github_release_manifest(data):
     ]
 
     if not zip_assets:
-        raise ValueError("GitHub Release 里没有找到 .zip 更新包")
+        raise ValueError(t("updater.github_zip_missing"))
 
     asset = zip_assets[0]
     digest = str(asset.get("digest") or "").strip()
@@ -92,13 +86,11 @@ def normalize_github_release_manifest(data):
 
 def get_package_filename(manifest):
     filename = str(manifest.get("package_name") or "").strip()
-
     if filename:
         return filename
 
     parsed = urlparse(manifest["package_url"])
     filename = Path(parsed.path).name
-
     if filename:
         return filename
 
@@ -122,7 +114,7 @@ def download_update_package(manifest, target_dir, progress_callback=None, cancel
         with open(part, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024 * 256):
                 if cancel_flag and cancel_flag.get("cancel"):
-                    raise RuntimeError("已取消下载")
+                    raise RuntimeError(t("updater.download_cancelled"))
 
                 if not chunk:
                     continue
@@ -142,9 +134,11 @@ def download_update_package(manifest, target_dir, progress_callback=None, cancel
         except Exception:
             pass
         raise ValueError(
-            "更新包校验失败：sha256 不一致\n"
-            f"期望：{sha256_expected}\n"
-            f"实际：{sha256_actual}"
+            t(
+                "updater.sha256_mismatch",
+                expected=sha256_expected,
+                actual=sha256_actual,
+            )
         )
 
     if target.exists():

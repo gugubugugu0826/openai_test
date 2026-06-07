@@ -86,7 +86,7 @@ try:
     from desktop_agent.version import APP_NAME, APP_VERSION
 except Exception:
     APP_NAME = "Qwen Desktop Organizer Agent"
-    APP_VERSION = "v2.1"
+    APP_VERSION = "v2.2"
 
 # 关闭程序时用于停止内置 llama-server（避免它占用文件导致目录删不掉）
 try:
@@ -158,17 +158,17 @@ class DesktopAgentGUI(
 ):
     # 主导航（普通用户）
     PRIMARY_NAV = [
-        ("Home",     "整理桌面"),
-        ("Review",   "整理方案"),
-        ("Settings", "设置"),
-        ("Help",     "帮助"),
+        ("Home",     "nav.home"),
+        ("Review",   "nav.review"),
+        ("Settings", "nav.settings"),
+        ("Help",     "nav.help"),
     ]
     # 高级导航（折叠在分隔线下方）
     ADVANCED_NAV = [
-        ("Explanation", "计划解释"),
-        ("Memory",      "整理记忆"),
-        ("Logs",        "运行日志"),
-        ("Advanced",    "高级操作"),
+        ("Explanation", "nav.explanation"),
+        ("Memory",      "nav.memory"),
+        ("Logs",        "nav.logs"),
+        ("Advanced",    "nav.advanced"),
     ]
     # 每个页面对应的 Unicode 图标
     NAV_ICONS = {
@@ -184,12 +184,12 @@ class DesktopAgentGUI(
 
     # 环境自检项 → 人话名称
     FRIENDLY_CHECKS = {
-        "Config": "配置文件",
-        "Desktop Path": "桌面 / 扫描位置",
-        "Target Root": "整理目标位置",
-        "Model": "AI 模型",
-        "Builtin Runtime": "自带 AI 引擎",
-        "Modules": "核心组件",
+        "Config": "checks.config",
+        "Desktop Path": "checks.desktop_path",
+        "Target Root": "checks.target_root",
+        "Model": "checks.model",
+        "Builtin Runtime": "checks.builtin_runtime",
+        "Modules": "checks.modules",
     }
     # 普通用户不需要看到的内部检查项
     HIDDEN_CHECKS = {"Ollama API", "OpenAI-compatible Config"}
@@ -202,7 +202,7 @@ class DesktopAgentGUI(
         patch_customtkinter(ctk)
         install_runtime_output_translation()
 
-        self.root.title(f"{t(APP_TITLE)} {APP_VERSION}")
+        self.root.title(f"{t('app.title')} {APP_VERSION}")
         self.root.geometry("1320x840")
         self.root.minsize(1180 if is_english() else 1120, 720)
 
@@ -235,7 +235,7 @@ class DesktopAgentGUI(
         self.nav_indicators = {}
 
         self.review_items = []
-        self.review_filter_var = tk.StringVar(value=t("全部"))
+        self.review_filter_var = tk.StringVar(value=t("common.all"))
         self.config_vars = {}
         self.dashboard_vars = {}
         self.init_log_file()
@@ -244,9 +244,9 @@ class DesktopAgentGUI(
         self.poll_output_queue()
 
         self.append_output("=" * 90 + "\n")
-        self.append_output(f"{APP_NAME} {APP_VERSION} started.\n")
-        self.append_output(f"App directory: {PROJECT_DIR}\n")
-        self.append_output(f"Log file: {self.current_log_file}\n")
+        self.append_output(f"{APP_NAME} {APP_VERSION} {t('app.started')}\n")
+        self.append_output(t("app.directory_log", path=PROJECT_DIR) + "\n")
+        self.append_output(t("app.log_file_log", path=self.current_log_file) + "\n")
         self.append_output("=" * 90 + "\n")
 
         self.show_page("Home")
@@ -362,9 +362,7 @@ class DesktopAgentGUI(
         self.write_log("\n[GUI] Output window cleared.\n")
         if hasattr(self, "log_status_var"):
             self.log_status_var.set(
-                "Output cleared. New runtime output will appear below."
-                if is_english() else
-                "输出窗口已清空。新的运行输出会继续显示在下方。"
+                t("app.output_cleared")
             )
 
     def open_logs_folder(self):
@@ -372,20 +370,20 @@ class DesktopAgentGUI(
             LOG_DIR.mkdir(parents=True, exist_ok=True)
             subprocess.Popen(f'explorer "{LOG_DIR}"')
         except Exception as e:
-            messagebox.showerror("错误", str(e))
+            messagebox.showerror(t("common.error"), str(e))
 
     def open_current_log_file(self):
         if not self.current_log_file or not self.current_log_file.exists():
             messagebox.showwarning(
-                "没有日志文件" if not is_english() else "No Log File",
-                "当前日志文件不存在。" if not is_english() else "The current log file does not exist."
+                t("app.no_log_title"),
+                t("app.no_log_message")
             )
             return
 
         try:
             os.startfile(str(self.current_log_file))
         except Exception as e:
-            messagebox.showerror("错误", str(e))
+            messagebox.showerror(t("common.error"), str(e))
 
     # =====================================================
     # UI Base
@@ -443,7 +441,7 @@ class DesktopAgentGUI(
 
         ctk.CTkLabel(
             self.sidebar,
-            text=t(APP_TITLE),
+            text=t("app.title"),
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COL_TEXT,
             anchor="w",
@@ -465,8 +463,8 @@ class DesktopAgentGUI(
         ).grid(row=r, column=0, padx=16, pady=(0, 8), sticky="ew")
         r += 1
 
-        for page_name, text in self.PRIMARY_NAV:
-            self._add_nav_button(page_name, text, r)
+        for page_name, text_key in self.PRIMARY_NAV:
+            self._add_nav_button(page_name, t(text_key), r)
             r += 1
 
         # 高级分区分隔线
@@ -477,21 +475,21 @@ class DesktopAgentGUI(
 
         ctk.CTkLabel(
             self.sidebar,
-            text=t("高级"),
+            text=t("nav.advanced_section"),
             text_color="#9ca3af",
             font=ctk.CTkFont(size=11),
             anchor="w",
         ).grid(row=r, column=0, padx=20, pady=(0, 2), sticky="w")
         r += 1
 
-        for page_name, text in self.ADVANCED_NAV:
-            self._add_nav_button(page_name, text, r)
+        for page_name, text_key in self.ADVANCED_NAV:
+            self._add_nav_button(page_name, t(text_key), r)
             r += 1
 
         self.sidebar.grid_rowconfigure(r, weight=1)
         r += 1
 
-        self.status_var = tk.StringVar(value=t("就绪"))
+        self.status_var = tk.StringVar(value=t("common.ready"))
         ctk.CTkLabel(
             self.sidebar,
             textvariable=self.status_var,
@@ -505,7 +503,7 @@ class DesktopAgentGUI(
         # 底部快捷按钮 — 轮廓风格，与侧边栏色调一致
         ctk.CTkButton(
             self.sidebar,
-            text="⬡  打开整理目录",
+            text=t("app.open_target_button"),
             height=34,
             corner_radius=8,
             fg_color="transparent",
@@ -559,7 +557,7 @@ class DesktopAgentGUI(
             justify="left",
         ).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        lang_label = "ENG" if get_language() == "zh" else "中文"
+        lang_label = "ENG" if get_language() == "zh" else "CN"
         ctk.CTkButton(
             header,
             text=lang_label,
@@ -614,19 +612,19 @@ class DesktopAgentGUI(
 
         pending = None
         if cur == "Settings" and self.config_dirty:
-            pending = ("设置", self.save_config_panel, "config_dirty")
+            pending = (t("nav.settings"), self.save_config_panel, "config_dirty")
         elif cur == "Review" and self.review_dirty:
-            pending = ("整理方案", self.save_review_table, "review_dirty")
+            pending = (t("nav.review"), self.save_review_table, "review_dirty")
         elif cur == "Memory" and self.memory_dirty:
-            pending = ("整理记忆", self.save_memory_panel, "memory_dirty")
+            pending = (t("nav.memory"), self.save_memory_panel, "memory_dirty")
 
         if pending is None:
             return True
 
         label, save_func, flag = pending
         answer = messagebox.askyesnocancel(
-            "有未保存的修改",
-            f"「{label}」有修改还没保存。\n\n是 = 保存并离开\n否 = 放弃修改并离开\n取消 = 留在本页",
+            t("app.unsaved_title"),
+            t("app.unsaved_message", label=label),
         )
 
         if answer is None:
@@ -680,13 +678,13 @@ class DesktopAgentGUI(
     def get_category_display_options(self, include_all=False):
         options = get_category_display_options(CATEGORIES)
         if include_all:
-            return [t("全部")] + options
+            return [t("common.all")] + options
         return options
 
     def display_to_category(self, display_value):
         if display_value in ("", None):
             return display_value
-        if display_value == t("全部"):
+        if display_value == t("common.all"):
             return "全部"
         for category in CATEGORIES:
             if display_value == get_category_display(category):
@@ -694,12 +692,12 @@ class DesktopAgentGUI(
         return display_value
 
     def category_to_display(self, category):
-        if category in ("全部", t("全部")):
-            return t("全部")
+        if category in ("全部", t("common.all")):
+            return t("common.all")
         return get_category_display(category)
 
     def rebuild_window_for_language(self, target_page="Settings"):
-        self.root.title(f"{t(APP_TITLE)} {APP_VERSION}")
+        self.root.title(f"{t('app.title')} {APP_VERSION}")
         self.root.minsize(1180 if is_english() else 1120, 720)
 
         for child in list(self.root.winfo_children()):
@@ -712,7 +710,7 @@ class DesktopAgentGUI(
         self.review_check_vars = {}
         self.config_vars = {}
         self.dashboard_vars = {}
-        self.review_filter_var = tk.StringVar(value=t("全部"))
+        self.review_filter_var = tk.StringVar(value=t("common.all"))
 
         self.build_ui()
         self.show_page(target_page)
@@ -728,14 +726,14 @@ class DesktopAgentGUI(
 
         message = (
             f"{APP_NAME} {APP_VERSION}\n\n"
-            f"{t('当前模式：')}{config.get('llm_provider')}\n"
-            f"{t('目标目录：')}{config.get('normal_target_root')}\n"
-            f"{t('folder_mode：')}{config.get('folder_mode')}\n\n"
-            f"{t('程序目录：', default='程序目录：')}\n{PROJECT_DIR}\n\n"
-            f"{t('当前日志：', default='当前日志：')}\n{self.current_log_file}\n"
+            f"{t('app.about_mode')}{config.get('llm_provider')}\n"
+            f"{t('app.about_target')}{config.get('normal_target_root')}\n"
+            f"{t('app.about_folder_mode')}{config.get('folder_mode')}\n\n"
+            f"{t('app.about_project_dir')}\n{PROJECT_DIR}\n\n"
+            f"{t('app.about_current_log')}\n{self.current_log_file}\n"
         )
 
-        messagebox.showinfo("About / 关于", message)
+        messagebox.showinfo(t("app.about_title"), message)
 
     def on_close(self):
         # 关闭前：若当前页有未保存修改，先询问保存

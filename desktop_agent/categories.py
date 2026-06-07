@@ -1,5 +1,3 @@
-# desktop_agent/categories.py
-
 CATEGORIES = [
     "课程资料",
     "代码项目",

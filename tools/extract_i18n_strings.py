@@ -20,19 +20,28 @@ IGNORE_FILES = {
     PROJECT_DIR / "desktop_agent" / "i18n.py",
 }
 
+IGNORE_TEXT_EXACT = {
+    "README_使用说明.txt",
+    "99_其他快捷方式",
+    "无法",
+}
+
+IGNORE_ASSIGN_TARGETS = {
+    "DEFAULT_MEMORY",
+    "CATEGORIES",
+    "SHORTCUT_CATEGORY_FOLDERS",
+    "NORMAL_CATEGORY_FOLDERS",
+}
+
 
 def load_locale_strings():
-    zh_path = LOCALES_DIR / "zh.json"
-    if not zh_path.exists():
-        return set()
-
-    with open(zh_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
     keys = set()
-    for bucket_name in ("translations", "categories", "substrings"):
-        bucket = data.get(bucket_name, {})
-        keys.update(bucket.keys())
+    for zh_path in sorted(LOCALES_DIR.glob("zh*.json")):
+        with open(zh_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for bucket_name in ("translations", "categories", "substrings"):
+            bucket = data.get(bucket_name, {})
+            keys.update(bucket.keys())
     return keys
 
 
@@ -49,18 +58,85 @@ def classify_file(path: Path) -> str:
 def extract_strings_from_file(path: Path):
     content = path.read_text(encoding="utf-8-sig")
     tree = ast.parse(content, filename=str(path))
+    parents = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+
+    ignored_docstring_nodes = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body:
+            first = node.body[0]
+            if (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            ):
+                ignored_docstring_nodes.add(first.value)
+
+    ignored_assignment_values = set()
+    ignored_function_bodies = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            target_names = {
+                target.id
+                for target in node.targets
+                if isinstance(target, ast.Name)
+            }
+            if target_names & IGNORE_ASSIGN_TARGETS:
+                ignored_assignment_values.add(node.value)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name in {"build_classification_prompt"}:
+                ignored_function_bodies.add(node)
+
     findings = []
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             value = node.value.strip()
+            if node in ignored_docstring_nodes:
+                continue
+            if value in IGNORE_TEXT_EXACT:
+                continue
             if value and CHINESE_RE.search(value):
+                skip = False
+                parent = parents.get(node)
+                while parent is not None:
+                    if parent in ignored_assignment_values:
+                        skip = True
+                        break
+                    if parent in ignored_function_bodies:
+                        skip = True
+                        break
+                    if isinstance(parent, ast.Call) and isinstance(parent.func, ast.Name) and parent.func.id == "contains_any":
+                        skip = True
+                        break
+                    parent = parents.get(parent)
+                if skip:
+                    continue
                 findings.append((node.lineno, value))
         elif isinstance(node, ast.JoinedStr):
             for value_node in node.values:
                 if isinstance(value_node, ast.Constant) and isinstance(value_node.value, str):
                     value = value_node.value.strip()
+                    if value in IGNORE_TEXT_EXACT:
+                        continue
                     if value and CHINESE_RE.search(value):
+                        skip = False
+                        parent = parents.get(node)
+                        while parent is not None:
+                            if parent in ignored_assignment_values:
+                                skip = True
+                                break
+                            if parent in ignored_function_bodies:
+                                skip = True
+                                break
+                            if isinstance(parent, ast.Call) and isinstance(parent.func, ast.Name) and parent.func.id == "contains_any":
+                                skip = True
+                                break
+                            parent = parents.get(parent)
+                        if skip:
+                            continue
                         findings.append((value_node.lineno, value))
 
     dedup = []

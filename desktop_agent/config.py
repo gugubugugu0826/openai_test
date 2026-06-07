@@ -1,6 +1,6 @@
-# desktop_agent/config.py
-
 from pathlib import Path
+
+from desktop_agent.i18n import t
 from desktop_agent.storage import load_json
 
 
@@ -12,7 +12,7 @@ def load_config():
 
     if not path.exists():
         raise FileNotFoundError(
-            f"找不到 {CONFIG_FILE}，请先创建 config.json"
+            t("config.file_missing", path=CONFIG_FILE)
         )
 
     config = load_json(path)
@@ -24,9 +24,6 @@ def load_config():
     config["desktop_path"] = desktop_path
 
     if not str(config.get("normal_target_root") or "").strip():
-        raise ValueError(
-            "config.json 缺少必要字段：normal_target_root\n"
-            "请在 GUI 设置页或 config.json 中填写目标整理目录后重试。"
-        )
+        raise ValueError(t("config.target_root_missing"))
 
     return config

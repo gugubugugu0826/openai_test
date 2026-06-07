@@ -2,15 +2,14 @@ import re
 import sys
 from pathlib import Path
 
-# Allow running directly (python tools/check_release_consistency.py) or as a module
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+# Allow running directly (python tools/check_release_consistency.py) or as a module.
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
 
 from desktop_agent.version import APP_EXE_NAME, APP_VERSION
 
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
 README_PATH = PROJECT_DIR / "README.md"
 BUILD_RELEASE_PATH = PROJECT_DIR / "build_release.py"
 APP_UI_PATH = PROJECT_DIR / "desktop_agent_ui" / "app.py"
@@ -50,52 +49,53 @@ def main():
     ci_workflow = read_text(CI_WORKFLOW_PATH)
     release_workflow = read_text(RELEASE_WORKFLOW_PATH)
 
-    require(release_zip in readme, f"README.md 未包含当前发布 zip 名称：{release_zip}", failures)
-    require(release_dir in readme, f"README.md 未包含当前发布目录名称：{release_dir}", failures)
-    require(f"version-{APP_VERSION}-blue" in readme, f"README.md 顶部版本徽章未更新到 {APP_VERSION}", failures)
+    require(release_zip in readme, f"README.md does not mention the current release zip name: {release_zip}", failures)
+    require(release_dir in readme, f"README.md does not mention the current release directory name: {release_dir}", failures)
+    require(f"version-{APP_VERSION}-blue" in readme, f"README.md badge is not updated to {APP_VERSION}", failures)
 
-    require('APP_EXE_NAME = "QwenDesktopAgent"' in build_release, "build_release.py fallback APP_EXE_NAME 异常", failures)
-    require(f'APP_VERSION = "{APP_VERSION}"' in build_release, f"build_release.py fallback APP_VERSION 未对齐到 {APP_VERSION}", failures)
-    require('APP_NAME = APP_EXE_NAME' in build_release, "build_release.py 未从 APP_EXE_NAME 派生 APP_NAME", failures)
-    require('VERSION = APP_VERSION' in build_release, "build_release.py 未从 APP_VERSION 派生 VERSION", failures)
-    require('RELEASE_DIR = PROJECT_DIR / f"{APP_NAME}_{VERSION}"' in build_release, "build_release.py 发布目录命名规则异常", failures)
+    require('APP_EXE_NAME = "QwenDesktopAgent"' in build_release, "build_release.py fallback APP_EXE_NAME is unexpected", failures)
+    require(f'APP_VERSION = "{APP_VERSION}"' in build_release, f"build_release.py fallback APP_VERSION is not aligned to {APP_VERSION}", failures)
+    require('APP_NAME = APP_EXE_NAME' in build_release, "build_release.py does not derive APP_NAME from APP_EXE_NAME", failures)
+    require('VERSION = APP_VERSION' in build_release, "build_release.py does not derive VERSION from APP_VERSION", failures)
+    require('RELEASE_DIR = PROJECT_DIR / f"{APP_NAME}_{VERSION}"' in build_release, "build_release.py release directory naming rule is unexpected", failures)
 
-    require(f'APP_VERSION = "{APP_VERSION}"' in app_ui, f"desktop_agent_ui/app.py fallback APP_VERSION 未对齐到 {APP_VERSION}", failures)
-    require(f'APP_VERSION = "{APP_VERSION}"' in logs_ui, f"desktop_agent_ui/pages_logs.py fallback APP_VERSION 未对齐到 {APP_VERSION}", failures)
-    require("actions/checkout@v5" in ci_workflow, "ci.yml 未升级到 actions/checkout@v5", failures)
-    require("actions/setup-python@v6" in ci_workflow, "ci.yml 未升级到 actions/setup-python@v6", failures)
-    require("actions/upload-artifact@v5" in ci_workflow, "ci.yml 未升级到 actions/upload-artifact@v5", failures)
-    require("runs-on: windows-2025" in ci_workflow, "ci.yml 未固定到 windows-2025 runner", failures)
+    require(f'APP_VERSION = "{APP_VERSION}"' in app_ui, f"desktop_agent_ui/app.py fallback APP_VERSION is not aligned to {APP_VERSION}", failures)
+    require(f'APP_VERSION = "{APP_VERSION}"' in logs_ui, f"desktop_agent_ui/pages_logs.py fallback APP_VERSION is not aligned to {APP_VERSION}", failures)
 
-    require("actions/checkout@v5" in release_workflow, "release.yml 未升级到 actions/checkout@v5", failures)
-    require("actions/setup-python@v6" in release_workflow, "release.yml 未升级到 actions/setup-python@v6", failures)
-    require("actions/upload-artifact@v5" in release_workflow, "release.yml 未升级到 actions/upload-artifact@v5", failures)
-    require("runs-on: windows-2025" in release_workflow, "release.yml 未固定到 windows-2025 runner", failures)
-    require("python tools/check_release_tag.py" in release_workflow, "release.yml 缺少 tag/version 强校验步骤", failures)
-    require("python tools/generate_release_notes.py" in release_workflow, "release.yml 缺少自动生成 release notes 步骤", failures)
-    require("python tools/generate_release_manifest.py" in release_workflow, "release.yml 缺少 release manifest 生成步骤", failures)
-    require("body_path: release_notes.md" in release_workflow, "release.yml 未把 release_notes.md 附加到 GitHub Release", failures)
-    require("release_manifest.json" in release_workflow, "release.yml 未附加 release_manifest.json", failures)
-    require("release_manifest.md" in release_workflow, "release.yml 未附加 release_manifest.md", failures)
-    require("GITHUB_STEP_SUMMARY" in release_workflow, "release.yml 未写入 workflow summary", failures)
+    require("actions/checkout@v5" in ci_workflow, "ci.yml is not upgraded to actions/checkout@v5", failures)
+    require("actions/setup-python@v6" in ci_workflow, "ci.yml is not upgraded to actions/setup-python@v6", failures)
+    require("actions/upload-artifact@v5" in ci_workflow, "ci.yml is not upgraded to actions/upload-artifact@v5", failures)
+    require("runs-on: windows-2025" in ci_workflow, "ci.yml is not pinned to windows-2025", failures)
+
+    require("actions/checkout@v5" in release_workflow, "release.yml is not upgraded to actions/checkout@v5", failures)
+    require("actions/setup-python@v6" in release_workflow, "release.yml is not upgraded to actions/setup-python@v6", failures)
+    require("actions/upload-artifact@v5" in release_workflow, "release.yml is not upgraded to actions/upload-artifact@v5", failures)
+    require("runs-on: windows-2025" in release_workflow, "release.yml is not pinned to windows-2025", failures)
+    require("python tools/check_release_tag.py" in release_workflow, "release.yml is missing the tag/version validation step", failures)
+    require("python tools/generate_release_notes.py" in release_workflow, "release.yml is missing the release notes generation step", failures)
+    require("python tools/generate_release_manifest.py" in release_workflow, "release.yml is missing the release manifest generation step", failures)
+    require("body_path: release_notes.md" in release_workflow, "release.yml does not attach release_notes.md to the GitHub Release", failures)
+    require("release_manifest.json" in release_workflow, "release.yml does not attach release_manifest.json", failures)
+    require("release_manifest.md" in release_workflow, "release.yml does not attach release_manifest.md", failures)
+    require("GITHUB_STEP_SUMMARY" in release_workflow, "release.yml does not write to the workflow summary", failures)
 
     stale_release_refs = sorted(
         {
             match
             for match in re.findall(rf"{re.escape(APP_EXE_NAME)}_v\d+\.\d+(?:\.\d+)?(?:\.zip)?", readme)
-            if APP_VERSION not in match and not match.endswith("v2.1.zip")
+            if APP_VERSION not in match
         }
     )
     if stale_release_refs:
-        failures.append("README.md 含疑似过期的发布命名引用：" + ", ".join(stale_release_refs))
+        failures.append("README.md contains stale release references: " + ", ".join(stale_release_refs))
 
     if failures:
-        safe_print("版本/README/发布命名一致性检查失败：")
+        safe_print("Release consistency check failed:")
         for item in failures:
             safe_print(f"- {item}")
         raise SystemExit(1)
 
-    safe_print("版本/README/发布命名一致性检查通过。")
+    safe_print("Release consistency check passed.")
     safe_print(f"- APP_EXE_NAME: {APP_EXE_NAME}")
     safe_print(f"- APP_VERSION: {APP_VERSION}")
     safe_print(f"- release_dir: {release_dir}")
